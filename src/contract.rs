@@ -1,6 +1,6 @@
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, to_binary};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Addr};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
@@ -18,13 +18,9 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    // TODO, instnatiate Map of Players, store information like how much it costs a ticket
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let config = Config {
-        cost_per_ticket: 0
-    };
-
+    let config = Config { cost_per_ticket: msg.ticket_cost };
     CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new()
@@ -50,10 +46,8 @@ fn execute_buy_ticket(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    bought_tickets: i32
+    bought_tickets: i32,
 ) -> Result<Response, ContractError> {
-    // let sender_addr_str = info.sender.to_string();
-
     let cfg = PLAYERS.may_load(deps.storage, &info.sender)?;
 
     match cfg {
@@ -74,7 +68,7 @@ fn execute_buy_ticket(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::TicketCount { addr } =>
+        TicketCount { addr } =>
             to_binary(&query_ticket_count(deps, _env, addr)?),
     }
 }
@@ -95,9 +89,12 @@ pub fn query_ticket_count(deps: Deps, _env: Env, addr: String) -> StdResult<Tick
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use cosmwasm_std::{coins, Uint128};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary};
+
+    use crate::msg::ExecuteMsg::BuyTicket;
+
+    use super::*;
 
     #[test]
     fn proper_initialization() {
@@ -112,13 +109,34 @@ mod tests {
     }
 
     #[test]
-    fn increment() {
+    fn buy_tickets() {
         let mut deps = mock_dependencies();
-    }
 
-    #[test]
-    fn reset() {
-        let mut deps = mock_dependencies();
+        let ticket_cost = Uint128::from(1000_u32);
+        let msg = InstantiateMsg { ticket_cost };
+
+        let _ = instantiate(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("creator", &coins(1000, "earth")),
+            msg)
+            .unwrap();
+
+        let _ = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("creator", &coins(1000, "earth")),
+            BuyTicket { num_tickets: 1 })
+            .unwrap();
+
+        let res = query_ticket_count(
+            deps.as_ref(),
+            mock_env(),
+            "creator".to_string());
+
+        assert!(res.is_ok());
+        let ticket_response = res.unwrap();
+        assert_eq!(ticket_response.tickets, Some(1))
 
     }
 }

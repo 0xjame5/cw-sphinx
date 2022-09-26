@@ -64,6 +64,19 @@ fn execute_buy_ticket(
     Ok(Response::new())
 }
 
+// use rand::{prelude::SliceRandom, Rng};
+use rand_pcg::Pcg32;
+use rand::{Rng, SeedableRng, rngs::StdRng, RngCore};
+
+// seed, and reference objects/the game. we also need a minum number bought...
+fn execute_lottery(deps: DepsMut, _env: Env, info: MessageInfo, seed: u64) -> Result<Response, ContractError> {
+    let mut rng = Pcg32::seed_from_u64(seed);
+    let random64 = rng.next_u64();
+
+
+    todo!()
+}
+
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
@@ -137,6 +150,5 @@ mod tests {
         assert!(res.is_ok());
         let ticket_response = res.unwrap();
         assert_eq!(ticket_response.tickets, Some(1))
-
     }
 }

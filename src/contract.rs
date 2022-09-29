@@ -1,15 +1,20 @@
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, to_binary};
+use std::ops::{Add, Div, Mul, Range};
+use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, to_binary};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cw2::set_contract_version;
 
+use rand_pcg::Pcg32;
+use rand::{Rng, SeedableRng, rngs::StdRng, RngCore};
+
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, TicketResponse};
 use crate::msg::QueryMsg::TicketCount;
+use crate::helpers::get_player_ranges;
+use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION, TOTAL_POOL_SIZE};
+use crate::models::PlayerRanges;
 use crate::state::{Config, CONFIG, PlayerInfo, PLAYERS};
 
-const CONTRACT_NAME: &str = "crates.io:cw-lootboxes";
-const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -31,14 +36,17 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::BuyTicket { num_tickets } =>
-            execute_buy_ticket(deps, _env, info, num_tickets),
+            execute_buy_ticket(deps, env, info, num_tickets),
         // ExecuteAsAdmin with a random seed the value
+        ExecuteMsg::ExecuteLottery { seed } => {
+            execute_lottery(deps, env, info, seed)
+        }
     }
 }
 
@@ -46,11 +54,11 @@ fn execute_buy_ticket(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    bought_tickets: i32,
+    bought_tickets: u64,
 ) -> Result<Response, ContractError> {
-    let cfg = PLAYERS.may_load(deps.storage, &info.sender)?;
+    let some_player_info = PLAYERS.may_load(deps.storage, &info.sender)?;
 
-    match cfg {
+    match some_player_info {
         None => {
             let new_player_info = PlayerInfo { tickets: bought_tickets };
             PLAYERS.save(deps.storage, &info.sender, &new_player_info)?
@@ -64,17 +72,55 @@ fn execute_buy_ticket(
     Ok(Response::new())
 }
 
-// use rand::{prelude::SliceRandom, Rng};
-use rand_pcg::Pcg32;
-use rand::{Rng, SeedableRng, rngs::StdRng, RngCore};
+fn execute_lottery(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    seed: u64
+) -> Result<Response, ContractError> {
+    // TODO:: Update to make sure config admin to execute the lottery
+    let _ = get_lottery_winner(deps, seed).unwrap();
+    Ok(Response::new())
+}
 
-// seed, and reference objects/the game. we also need a minum number bought...
-fn execute_lottery(deps: DepsMut, _env: Env, info: MessageInfo, seed: u64) -> Result<Response, ContractError> {
+fn get_lottery_winner(deps: DepsMut, seed: u64) -> Option<Addr> {
     let mut rng = Pcg32::seed_from_u64(seed);
-    let random64 = rng.next_u64();
 
+    let total_tickets = get_num_tickets(&deps);
 
-    todo!()
+    let winner_ticket = rng.gen_range(Range { start: 0, end: total_tickets });
+
+    let player_ranges = create_player_ranges(&deps, total_tickets);
+
+    let mut addr = None;
+    for player_range in player_ranges.0 {
+        if winner_ticket <= player_range.end_range && winner_ticket >= player_range.start_range {
+            addr = Some(player_range.player_addr)
+        }
+    }
+    addr
+}
+
+fn create_player_ranges(deps: &DepsMut, total_tickets: u64) -> PlayerRanges {
+    let mut player_ranges = PlayerRanges::create();
+    let mut current_index = 0;
+    for player_result in get_player_ranges(deps) {
+        let (addr, player_info) = player_result.unwrap();
+        let number_of_tickets_to_ration = TOTAL_POOL_SIZE.div(total_tickets).mul(player_info.tickets);
+        player_ranges.create_player_range(addr, current_index, current_index + number_of_tickets_to_ration);
+        current_index += number_of_tickets_to_ration
+    }
+    player_ranges
+}
+
+fn get_num_tickets(deps: &DepsMut) -> u64 {
+    let players = get_player_ranges(deps);
+    let mut total_num_tickets: u64 = 0;
+    for playersResult in players {
+        let (_addr, player_info) = playersResult.unwrap();
+        total_num_tickets += player_info.tickets
+    }
+    total_num_tickets
 }
 
 
@@ -91,7 +137,7 @@ pub fn query_ticket_count(deps: Deps, _env: Env, addr: String) -> StdResult<Tick
     let addr = deps.api.addr_validate(&addr)?;
     let res = PLAYERS.may_load(deps.storage, &addr)?;
 
-    let tickets_opt: Option<i32> = match res {
+    let tickets_opt: Option<u64> = match res {
         None => { None }
         Some(player_info) => { Some(player_info.tickets) }
     };

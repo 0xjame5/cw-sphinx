@@ -1,11 +1,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{
-    to_binary, Addr, CosmosMsg, StdResult, WasmMsg,
-};
+use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, WasmMsg, DepsMut, Order};
 
 use crate::msg::ExecuteMsg;
+use crate::state::{PlayerInfo, PLAYERS};
 
 /// CwTemplateContract is a wrapper around Addr that provides a lot of helpers
 /// for working with this.
@@ -26,22 +25,9 @@ impl CwTemplateContract {
         }
         .into())
     }
+}
 
 
-    // pub fn count<Q, T, CQ>(&self, querier: &Q) -> StdResult<GetCountResponse>
-    // where
-    //     Q: Querier,
-    //     T: Into<String>,
-    //     CQ: CustomQuery,
-    // {
-    //     // let msg = QueryMsg::GetTicketCount {};
-    //     // let query = WasmQuery::Smart {
-    //     //     contract_addr: self.addr().into(),
-    //     //     msg: to_binary(&msg)?,
-    //     // }
-    //     // .into();
-    //     // let res: GetCountResponse = QuerierWrapper::<CQ>::new(querier).query(&query)?;
-    //     // Ok(res)
-    //     Ok(())
-    // }
+pub fn get_player_ranges<'a>(deps: &'a DepsMut) -> Box<dyn Iterator<Item=StdResult<(cosmwasm_std::Addr, PlayerInfo)>> + 'a> {
+    PLAYERS.range(deps.storage, None, None, Order::Descending)
 }

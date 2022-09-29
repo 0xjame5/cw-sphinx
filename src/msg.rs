@@ -10,7 +10,8 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    BuyTicket { num_tickets: i32 },
+    BuyTicket { num_tickets: u64 },
+    ExecuteLottery { seed: u64 }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -22,5 +23,5 @@ pub enum QueryMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct TicketResponse {
-    pub tickets: Option<i32>,
+    pub tickets: Option<u64>,
 }

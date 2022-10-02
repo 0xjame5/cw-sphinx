@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::ops::{Add, Div, Mul, Range};
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, to_binary};
 #[cfg(not(feature = "library"))]
@@ -8,12 +9,11 @@ use rand_pcg::Pcg32;
 use rand::{Rng, SeedableRng, rngs::StdRng, RngCore};
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, TicketResponse};
-use crate::msg::QueryMsg::TicketCount;
+use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
 use crate::helpers::get_player_ranges;
 use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION, TOTAL_POOL_SIZE};
 use crate::models::PlayerRanges;
-use crate::state::{Config, CONFIG, PlayerInfo, PLAYERS};
+use crate::state::{Config, CONFIG, LOTTERY_STATE, LotteryState, PlayerInfo, PLAYERS};
 
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -27,6 +27,9 @@ pub fn instantiate(
 
     let config = Config { cost_per_ticket: msg.ticket_cost };
     CONFIG.save(deps.storage, &config)?;
+
+    let lottery_state = LotteryState::CHOOSING;
+    LOTTERY_STATE.save(deps.storage, &lottery_state)?;
 
     Ok(Response::new()
         .add_attribute("method", "instantiate")
@@ -43,7 +46,6 @@ pub fn execute(
     match msg {
         ExecuteMsg::BuyTicket { num_tickets } =>
             execute_buy_ticket(deps, env, info, num_tickets),
-        // ExecuteAsAdmin with a random seed the value
         ExecuteMsg::ExecuteLottery { seed } => {
             execute_lottery(deps, env, info, seed)
         }
@@ -78,18 +80,29 @@ fn execute_lottery(
     info: MessageInfo,
     seed: u64
 ) -> Result<Response, ContractError> {
+    let lottery_state = LOTTERY_STATE.load(deps.storage)?;
+
+    match lottery_state {
+        LotteryState::CHOOSING => {
+            choose_winner(deps, seed)?
+        }
+        LotteryState::OPEN => {
+
+        } // not met minimum number of tickets
+        LotteryState::CLOSED { winner } => {
+
+        }
+    }
     // TODO:: Update to make sure config admin to execute the lottery
-    let _ = get_lottery_winner(deps, seed).unwrap();
+
     Ok(Response::new())
 }
 
-fn get_lottery_winner(deps: DepsMut, seed: u64) -> Option<Addr> {
+
+fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
     let mut rng = Pcg32::seed_from_u64(seed);
-
     let total_tickets = get_num_tickets(&deps);
-
     let winner_ticket = rng.gen_range(Range { start: 0, end: total_tickets });
-
     let player_ranges = create_player_ranges(&deps, total_tickets);
 
     let mut addr = None;
@@ -98,7 +111,10 @@ fn get_lottery_winner(deps: DepsMut, seed: u64) -> Option<Addr> {
             addr = Some(player_range.player_addr)
         }
     }
-    addr
+
+    let winner = addr.unwrap();
+
+    LOTTERY_STATE.save(deps.storage, &LotteryState::CLOSED { winner })
 }
 
 fn create_player_ranges(deps: &DepsMut, total_tickets: u64) -> PlayerRanges {
@@ -127,11 +143,18 @@ fn get_num_tickets(deps: &DepsMut) -> u64 {
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        TicketCount { addr } =>
+        QueryMsg::TicketCount { addr } =>
             to_binary(&query_ticket_count(deps, _env, addr)?),
+        QueryMsg::LotteryState => {
+            to_binary(&query_lottery_state(deps, _env)?)
+        }
     }
 }
 
+pub fn query_lottery_state(deps: Deps, _env: Env) -> StdResult<LotteryStateResponse> {
+    let lottery_state = LOTTERY_STATE.load(deps.storage)?;
+    Ok(LotteryStateResponse{ lotto_state: lottery_state})
+}
 
 pub fn query_ticket_count(deps: Deps, _env: Env, addr: String) -> StdResult<TicketResponse> {
     let addr = deps.api.addr_validate(&addr)?;
@@ -151,7 +174,7 @@ mod tests {
     use cosmwasm_std::{coins, Uint128};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 
-    use crate::msg::ExecuteMsg::BuyTicket;
+    use crate::msg::ExecuteMsg::{BuyTicket, ExecuteLottery};
 
     use super::*;
 
@@ -170,7 +193,6 @@ mod tests {
     #[test]
     fn buy_tickets() {
         let mut deps = mock_dependencies();
-
         let ticket_cost = Uint128::from(1000_u32);
         let msg = InstantiateMsg { ticket_cost };
 
@@ -196,5 +218,58 @@ mod tests {
         assert!(res.is_ok());
         let ticket_response = res.unwrap();
         assert_eq!(ticket_response.tickets, Some(1))
+    }
+
+    #[test]
+    fn buy_tickets_and_lottery() {
+        let mut deps = mock_dependencies();
+        let ticket_cost = Uint128::from(1000_u32);
+        let msg = InstantiateMsg { ticket_cost };
+
+        let _ = instantiate(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("creator", &coins(1000, "earth")),
+            msg)
+            .unwrap();
+
+        struct TestUser {
+            pub addr: String,
+            pub tickets: u64
+        }
+
+        let mut test_users = vec![];
+        test_users.push(TestUser { addr: "creator".to_string(), tickets: 1 });
+        test_users.push(TestUser { addr: "a".to_string(), tickets: 10 });
+        test_users.push(TestUser { addr: "b".to_string(), tickets: 10 });
+        test_users.push(TestUser { addr: "c".to_string(), tickets: 10 });
+
+        for test_user in test_users {
+            execute(deps.as_mut(), mock_env(),
+                    mock_info(&test_user.addr, &coins(1000, "earth")),
+                    BuyTicket { num_tickets: test_user.tickets })
+                .unwrap();
+        }
+
+        let res = query_ticket_count(
+            deps.as_ref(),
+            mock_env(),
+            "creator".to_string());
+
+        assert!(res.is_ok());
+        let ticket_response = res.unwrap();
+        assert_eq!(ticket_response.tickets, Some(1));
+
+        /*
+        - When we buy and run the rando lottery we should have the ability to decide a winner,
+          and in this case we should have 1 winner.
+        */
+        let _ = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("creator", &coins(1000, "earth")),
+            ExecuteLottery { seed: 124212 }
+        );
+
     }
 }

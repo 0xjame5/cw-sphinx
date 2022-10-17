@@ -1,7 +1,6 @@
+use cosmwasm_std::{Addr, CosmosMsg, DepsMut, Order, StdResult, to_binary, WasmMsg};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, StdResult, WasmMsg, DepsMut, Order};
 
 use crate::msg::ExecuteMsg;
 use crate::state::{PlayerInfo, PLAYERS};

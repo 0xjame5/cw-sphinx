@@ -1,12 +1,14 @@
 use std::borrow::Borrow;
 use std::ops::{Add, Div, Mul, Range};
 
-use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, to_binary};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
+use cosmwasm_std::{
+    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult,
+};
 use cw2::set_contract_version;
 use cw_utils::{Duration, Expiration};
-use rand::{Rng, RngCore, rngs::StdRng, SeedableRng};
+use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use rand_pcg::Pcg32;
 
 use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION, TOTAL_POOL_SIZE};
@@ -14,7 +16,7 @@ use crate::error::ContractError;
 use crate::helpers::get_player_ranges;
 use crate::models::PlayerRanges;
 use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
-use crate::state::{Config, CONFIG, LOTTERY_STATE, LotteryState, PlayerInfo, PLAYERS};
+use crate::state::{Config, LotteryState, PlayerInfo, CONFIG, LOTTERY_STATE, PLAYERS};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -25,12 +27,17 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let config = Config { cost_per_ticket: msg.ticket_cost, };
+    let config = Config {
+        cost_per_ticket: msg.ticket_cost,
+    };
     CONFIG.save(deps.storage, &config)?;
 
     LOTTERY_STATE.save(
         deps.storage,
-        &LotteryState::OPEN { expiration: msg.lottery_duration.after(&_env.block) })?;
+        &LotteryState::OPEN {
+            expiration: msg.lottery_duration.after(&_env.block),
+        },
+    )?;
 
     Ok(Response::new()
         .add_attribute("method", "instantiate")
@@ -45,11 +52,8 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::BuyTicket { num_tickets } =>
-            execute_buy_ticket(deps, env, info, num_tickets),
-        ExecuteMsg::ExecuteLottery { seed } => {
-            execute_lottery(deps, env, info, seed)
-        }
+        ExecuteMsg::BuyTicket { num_tickets } => execute_buy_ticket(deps, env, info, num_tickets),
+        ExecuteMsg::ExecuteLottery { seed } => execute_lottery(deps, env, info, seed),
     }
 }
 
@@ -63,11 +67,15 @@ fn execute_buy_ticket(
 
     match some_player_info {
         None => {
-            let new_player_info = PlayerInfo { tickets: bought_tickets };
+            let new_player_info = PlayerInfo {
+                tickets: bought_tickets,
+            };
             PLAYERS.save(deps.storage, &info.sender, &new_player_info)?
         }
         Some(player_info) => {
-            let new_player_info = PlayerInfo { tickets: player_info.tickets + bought_tickets };
+            let new_player_info = PlayerInfo {
+                tickets: player_info.tickets + bought_tickets,
+            };
             PLAYERS.save(deps.storage, &info.sender, &new_player_info)?
         }
     }
@@ -77,32 +85,29 @@ fn execute_buy_ticket(
 fn execute_lottery(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo,
-    seed: u64
+    _info: MessageInfo,
+    seed: u64,
 ) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
     match lottery_state {
-        LotteryState::CHOOSING => {
-            choose_winner(deps, seed)?
-        }
-        LotteryState::OPEN { .. }=> {
+        LotteryState::CHOOSING => choose_winner(deps, seed)?,
+        LotteryState::OPEN { .. } => {
             //
-
         } // not met minimum number of tickets
-        LotteryState::CLOSED { winner: _winner } => {
-
-        }
+        LotteryState::CLOSED { winner: _winner } => {}
     }
     // TODO:: Update to make sure config admin to execute the lottery
 
     Ok(Response::new())
 }
 
-
 fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
     let mut rng = Pcg32::seed_from_u64(seed);
     let total_tickets = get_num_tickets(&deps);
-    let winner_ticket = rng.gen_range(Range { start: 0, end: total_tickets });
+    let winner_ticket = rng.gen_range(Range {
+        start: 0,
+        end: total_tickets,
+    });
     let player_ranges = create_player_ranges(&deps, total_tickets);
 
     let mut addr = None;
@@ -122,8 +127,13 @@ fn create_player_ranges(deps: &DepsMut, total_tickets: u64) -> PlayerRanges {
     let mut current_index = 0;
     for player_result in get_player_ranges(deps) {
         let (addr, player_info) = player_result.unwrap();
-        let number_of_tickets_to_ration = TOTAL_POOL_SIZE.div(total_tickets).mul(player_info.tickets);
-        player_ranges.create_player_range(addr, current_index, current_index + number_of_tickets_to_ration);
+        let number_of_tickets_to_ration =
+            TOTAL_POOL_SIZE.div(total_tickets).mul(player_info.tickets);
+        player_ranges.create_player_range(
+            addr,
+            current_index,
+            current_index + number_of_tickets_to_ration,
+        );
         current_index += number_of_tickets_to_ration
     }
     player_ranges
@@ -139,21 +149,19 @@ fn get_num_tickets(deps: &DepsMut) -> u64 {
     total_num_tickets
 }
 
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::TicketCount { addr } =>
-            to_binary(&query_ticket_count(deps, _env, addr)?),
-        QueryMsg::LotteryState => {
-            to_binary(&query_lottery_state(deps, _env)?)
-        }
+        QueryMsg::TicketCount { addr } => to_binary(&query_ticket_count(deps, _env, addr)?),
+        QueryMsg::LotteryState => to_binary(&query_lottery_state(deps, _env)?),
     }
 }
 
 pub fn query_lottery_state(deps: Deps, _env: Env) -> StdResult<LotteryStateResponse> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
-    Ok(LotteryStateResponse{ lotto_state: lottery_state})
+    Ok(LotteryStateResponse {
+        lotto_state: lottery_state,
+    })
 }
 
 pub fn query_ticket_count(deps: Deps, _env: Env, addr: String) -> StdResult<TicketResponse> {
@@ -161,18 +169,19 @@ pub fn query_ticket_count(deps: Deps, _env: Env, addr: String) -> StdResult<Tick
     let res = PLAYERS.may_load(deps.storage, &addr)?;
 
     let tickets_opt: Option<u64> = match res {
-        None => { None }
-        Some(player_info) => { Some(player_info.tickets) }
+        None => None,
+        Some(player_info) => Some(player_info.tickets),
     };
 
-    Ok(TicketResponse { tickets: tickets_opt })
+    Ok(TicketResponse {
+        tickets: tickets_opt,
+    })
 }
-
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{coins, Uint128};
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{coins, Uint128};
 
     use crate::msg::ExecuteMsg::{BuyTicket, ExecuteLottery};
 
@@ -182,7 +191,7 @@ mod tests {
     pub const TESTING_DURATION: Duration = Duration::Time(604_800);
     pub const TESTING_INST_MSG: InstantiateMsg = InstantiateMsg {
         ticket_cost: TESTING_TICKET_COST,
-        lottery_duration: TESTING_DURATION
+        lottery_duration: TESTING_DURATION,
     };
 
     #[test]
@@ -191,7 +200,6 @@ mod tests {
 
         let info = mock_info("creator", &coins(1000, "earth"));
 
-        // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, TESTING_INST_MSG.clone()).unwrap();
         assert_eq!(0, res.messages.len());
     }
@@ -204,20 +212,19 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("creator", &coins(1000, "earth")),
-            TESTING_INST_MSG)
-            .unwrap();
+            TESTING_INST_MSG,
+        )
+        .unwrap();
 
         let _ = execute(
             deps.as_mut(),
             mock_env(),
             mock_info("creator", &coins(1000, "earth")),
-            BuyTicket { num_tickets: 1 })
-            .unwrap();
+            BuyTicket { num_tickets: 1 },
+        )
+        .unwrap();
 
-        let res = query_ticket_count(
-            deps.as_ref(),
-            mock_env(),
-            "creator".to_string());
+        let res = query_ticket_count(deps.as_ref(), mock_env(), "creator".to_string());
 
         assert!(res.is_ok());
         let ticket_response = res.unwrap();
@@ -232,31 +239,46 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("creator", &coins(1000, "earth")),
-            TESTING_INST_MSG)
-            .unwrap();
+            TESTING_INST_MSG,
+        )
+        .unwrap();
 
         struct TestUser {
             pub addr: String,
-            pub tickets: u64
+            pub tickets: u64,
         }
 
         let mut test_users = vec![];
-        test_users.push(TestUser { addr: "creator".to_string(), tickets: 1 });
-        test_users.push(TestUser { addr: "a".to_string(), tickets: 10 });
-        test_users.push(TestUser { addr: "b".to_string(), tickets: 10 });
-        test_users.push(TestUser { addr: "c".to_string(), tickets: 10 });
+        test_users.push(TestUser {
+            addr: "creator".to_string(),
+            tickets: 1,
+        });
+        test_users.push(TestUser {
+            addr: "a".to_string(),
+            tickets: 10,
+        });
+        test_users.push(TestUser {
+            addr: "b".to_string(),
+            tickets: 10,
+        });
+        test_users.push(TestUser {
+            addr: "c".to_string(),
+            tickets: 10,
+        });
 
         for test_user in test_users {
-            execute(deps.as_mut(), mock_env(),
-                    mock_info(&test_user.addr, &coins(1000, "earth")),
-                    BuyTicket { num_tickets: test_user.tickets })
-                .unwrap();
+            execute(
+                deps.as_mut(),
+                mock_env(),
+                mock_info(&test_user.addr, &coins(1000, "earth")),
+                BuyTicket {
+                    num_tickets: test_user.tickets,
+                },
+            )
+            .unwrap();
         }
 
-        let res = query_ticket_count(
-            deps.as_ref(),
-            mock_env(),
-            "creator".to_string());
+        let res = query_ticket_count(deps.as_ref(), mock_env(), "creator".to_string());
 
         assert!(res.is_ok());
         let ticket_response = res.unwrap();
@@ -270,8 +292,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("creator", &coins(1000, "earth")),
-            ExecuteLottery { seed: 124212 }
+            ExecuteLottery { seed: 124212 },
         );
-
     }
 }

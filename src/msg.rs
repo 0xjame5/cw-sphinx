@@ -1,11 +1,13 @@
 use cosmwasm_std::{Addr, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use cw_utils::Duration;
 use crate::state::LotteryState;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub ticket_cost: Uint128
+    pub ticket_cost: Uint128,
+    pub lottery_duration: Duration
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

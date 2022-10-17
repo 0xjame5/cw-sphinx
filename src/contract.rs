@@ -1,20 +1,20 @@
 use std::borrow::Borrow;
 use std::ops::{Add, Div, Mul, Range};
+
 use cosmwasm_std::{Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult, to_binary};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cw2::set_contract_version;
-
+use cw_utils::{Duration, Expiration};
+use rand::{Rng, RngCore, rngs::StdRng, SeedableRng};
 use rand_pcg::Pcg32;
-use rand::{Rng, SeedableRng, rngs::StdRng, RngCore};
 
-use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
-use crate::helpers::get_player_ranges;
 use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION, TOTAL_POOL_SIZE};
+use crate::error::ContractError;
+use crate::helpers::get_player_ranges;
 use crate::models::PlayerRanges;
+use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
 use crate::state::{Config, CONFIG, LOTTERY_STATE, LotteryState, PlayerInfo, PLAYERS};
-
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -25,11 +25,12 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let config = Config { cost_per_ticket: msg.ticket_cost };
+    let config = Config { cost_per_ticket: msg.ticket_cost, };
     CONFIG.save(deps.storage, &config)?;
 
-    let lottery_state = LotteryState::CHOOSING;
-    LOTTERY_STATE.save(deps.storage, &lottery_state)?;
+    LOTTERY_STATE.save(
+        deps.storage,
+        &LotteryState::OPEN { expiration: msg.lottery_duration.after(&_env.block) })?;
 
     Ok(Response::new()
         .add_attribute("method", "instantiate")
@@ -70,7 +71,6 @@ fn execute_buy_ticket(
             PLAYERS.save(deps.storage, &info.sender, &new_player_info)?
         }
     }
-
     Ok(Response::new())
 }
 
@@ -81,15 +81,15 @@ fn execute_lottery(
     seed: u64
 ) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
-
     match lottery_state {
         LotteryState::CHOOSING => {
             choose_winner(deps, seed)?
         }
-        LotteryState::OPEN => {
+        LotteryState::OPEN { .. }=> {
+            //
 
         } // not met minimum number of tickets
-        LotteryState::CLOSED { winner } => {
+        LotteryState::CLOSED { winner: _winner } => {
 
         }
     }
@@ -178,29 +178,33 @@ mod tests {
 
     use super::*;
 
+    pub const TESTING_TICKET_COST: Uint128 = Uint128::new(1_000_000u128);
+    pub const TESTING_DURATION: Duration = Duration::Time(604_800);
+    pub const TESTING_INST_MSG: InstantiateMsg = InstantiateMsg {
+        ticket_cost: TESTING_TICKET_COST,
+        lottery_duration: TESTING_DURATION
+    };
+
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies();
 
-        let msg = InstantiateMsg { ticket_cost: Default::default() };
         let info = mock_info("creator", &coins(1000, "earth"));
 
         // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, TESTING_INST_MSG.clone()).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
     #[test]
     fn buy_tickets() {
         let mut deps = mock_dependencies();
-        let ticket_cost = Uint128::from(1000_u32);
-        let msg = InstantiateMsg { ticket_cost };
 
         let _ = instantiate(
             deps.as_mut(),
             mock_env(),
             mock_info("creator", &coins(1000, "earth")),
-            msg)
+            TESTING_INST_MSG)
             .unwrap();
 
         let _ = execute(
@@ -223,14 +227,12 @@ mod tests {
     #[test]
     fn buy_tickets_and_lottery() {
         let mut deps = mock_dependencies();
-        let ticket_cost = Uint128::from(1000_u32);
-        let msg = InstantiateMsg { ticket_cost };
 
         let _ = instantiate(
             deps.as_mut(),
             mock_env(),
             mock_info("creator", &coins(1000, "earth")),
-            msg)
+            TESTING_INST_MSG)
             .unwrap();
 
         struct TestUser {

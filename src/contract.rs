@@ -1,14 +1,11 @@
-use std::borrow::Borrow;
-use std::ops::{Add, Div, Mul, Range};
+use std::ops::{Div, Mul, Range};
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{
-    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult,
-};
+use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw2::set_contract_version;
-use cw_utils::{Duration, Expiration};
-use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+use cw_utils::Duration;
+use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
 
 use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION, TOTAL_POOL_SIZE};

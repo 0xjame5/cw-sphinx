@@ -1,9 +1,7 @@
-use cosmwasm_std::Uint128;
-
 pub struct PlayerRanges(pub Vec<PlayerRange>);
 
 impl PlayerRanges {
-    pub fn create() ->PlayerRanges {
+    pub fn create() -> PlayerRanges {
         PlayerRanges { 0: vec![] }
     }
 
@@ -11,15 +9,14 @@ impl PlayerRanges {
         let player_range = PlayerRange {
             player_addr: addr,
             start_range: start,
-            end_range: end
+            end_range: end,
         };
         self.0.push(player_range)
     }
-
 }
 
 pub struct PlayerRange {
     pub player_addr: cosmwasm_std::Addr,
     pub start_range: u64,
-    pub end_range: u64
+    pub end_range: u64,
 }

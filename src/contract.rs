@@ -87,15 +87,14 @@ fn execute_lottery(
 ) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
     match lottery_state {
-        LotteryState::CHOOSING => choose_winner(deps, seed)?,
-        LotteryState::OPEN { .. } => {
-            //
-        } // not met minimum number of tickets
-        LotteryState::CLOSED { winner: _winner } => {}
+        LotteryState::CHOOSING => {
+            // TODO(james):: Check before choosing winner to see if the caller is whitelisted (admin).
+            choose_winner(deps, seed)?;
+            Ok(Response::new())
+        }
+        LotteryState::OPEN { .. } => Err(ContractError::LotteryNotExecutable {}),
+        LotteryState::CLOSED { .. } => Err(ContractError::LotteryNotExecutable {}),
     }
-    // TODO:: Update to make sure config admin to execute the lottery
-
-    Ok(Response::new())
 }
 
 fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
@@ -185,7 +184,8 @@ mod tests {
     use super::*;
 
     pub const TESTING_TICKET_COST: Uint128 = Uint128::new(1_000_000u128);
-    pub const TESTING_DURATION: Duration = Duration::Time(604_800);
+    pub const TESTING_1_WEEK_IN_SECONDS: u64 = 604_800u64;
+    pub const TESTING_DURATION: Duration = Duration::Time(TESTING_1_WEEK_IN_SECONDS);
     pub const TESTING_INST_MSG: InstantiateMsg = InstantiateMsg {
         ticket_cost: TESTING_TICKET_COST,
         lottery_duration: TESTING_DURATION,

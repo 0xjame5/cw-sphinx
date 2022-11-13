@@ -2,7 +2,7 @@ use std::ops::{Div, Mul, Range};
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw2::set_contract_version;
 use cw_utils::Duration;
 use rand::{Rng, SeedableRng};
@@ -15,6 +15,10 @@ use crate::models::PlayerRanges;
 use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
 use crate::state::{Config, LotteryState, PlayerInfo, CONFIG, LOTTERY_STATE, PLAYERS};
 
+/*
+Each individual contract owner will be able to creat their own ticket cost. We require it to be
+set to be more defined.
+*/
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -27,6 +31,7 @@ pub fn instantiate(
     let config = Config {
         cost_per_ticket: msg.ticket_cost,
     };
+
     CONFIG.save(deps.storage, &config)?;
 
     LOTTERY_STATE.save(
@@ -41,6 +46,16 @@ pub fn instantiate(
         .add_attribute("owner", info.sender))
 }
 
+/*
+There are three states of the lottery.
+- Open - we are actively allowing users to keep adding to the lottery state
+- Choosing - we no longer allow a user to vote, however we have
+- Closed - the winner of the lottery is stored in this state, and we return it alongside the address
+
+After choosing a closed vote, a winner should be able to then execute a function on the contract
+to retrieve their assets. 1% of the rewards will be set to the DAO treasury for continued deving.
+""
+*/
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
@@ -60,23 +75,29 @@ fn execute_buy_ticket(
     info: MessageInfo,
     bought_tickets: u64,
 ) -> Result<Response, ContractError> {
-    let some_player_info = PLAYERS.may_load(deps.storage, &info.sender)?;
+    // if a user is trying to buy a ticket, before doing so. check to see if the
 
+    update_player(deps, &info, bought_tickets)?;
+
+    Ok(Response::new())
+}
+
+fn update_player(deps: DepsMut, info: &MessageInfo, bought_tickets: u64) -> StdResult<()> {
+    let some_player_info = PLAYERS.may_load(deps.storage, &info.sender)?;
     match some_player_info {
         None => {
             let new_player_info = PlayerInfo {
                 tickets: bought_tickets,
             };
-            PLAYERS.save(deps.storage, &info.sender, &new_player_info)?
+            PLAYERS.save(deps.storage, &info.sender, &new_player_info)
         }
         Some(player_info) => {
             let new_player_info = PlayerInfo {
                 tickets: player_info.tickets + bought_tickets,
             };
-            PLAYERS.save(deps.storage, &info.sender, &new_player_info)?
+            PLAYERS.save(deps.storage, &info.sender, &new_player_info)
         }
     }
-    Ok(Response::new())
 }
 
 fn execute_lottery(
@@ -160,8 +181,7 @@ pub fn query_lottery_state(deps: Deps, _env: Env) -> StdResult<LotteryStateRespo
     })
 }
 
-pub fn query_ticket_count(deps: Deps, _env: Env, addr: String) -> StdResult<TicketResponse> {
-    let addr = deps.api.addr_validate(&addr)?;
+pub fn query_ticket_count(deps: Deps, _env: Env, addr: Addr) -> StdResult<TicketResponse> {
     let res = PLAYERS.may_load(deps.storage, &addr)?;
 
     let tickets_opt: Option<u64> = match res {
@@ -176,8 +196,14 @@ pub fn query_ticket_count(deps: Deps, _env: Env, addr: String) -> StdResult<Tick
 
 #[cfg(test)]
 mod tests {
+
+    fn mock_app() -> App {
+        App::default()
+    }
+
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Uint128};
+    use cosmwasm_std::{coins, Addr, Uint128};
+    use cw_multi_test::App;
 
     use crate::msg::ExecuteMsg::{BuyTicket, ExecuteLottery};
 
@@ -191,12 +217,15 @@ mod tests {
         lottery_duration: TESTING_DURATION,
     };
 
+    pub struct TestUser {
+        pub addr: String,
+        pub tickets: u64,
+    }
+
     #[test]
     fn proper_initialization() {
         let mut deps = mock_dependencies();
-
         let info = mock_info("creator", &coins(1000, "earth"));
-
         let res = instantiate(deps.as_mut(), mock_env(), info, TESTING_INST_MSG.clone()).unwrap();
         assert_eq!(0, res.messages.len());
     }
@@ -221,7 +250,11 @@ mod tests {
         )
         .unwrap();
 
-        let res = query_ticket_count(deps.as_ref(), mock_env(), "creator".to_string());
+        let res = query_ticket_count(
+            deps.as_ref(),
+            mock_env(),
+            Addr::unchecked("creator".to_string()),
+        );
 
         assert!(res.is_ok());
         let ticket_response = res.unwrap();
@@ -229,8 +262,22 @@ mod tests {
     }
 
     #[test]
-    fn buy_tickets_and_lottery() {
+    fn buy_multiple_tickets() {
         let mut deps = mock_dependencies();
+        let test_users = vec![
+            TestUser {
+                addr: "creator".to_string(),
+                tickets: 1,
+            },
+            TestUser {
+                addr: "testUserA".to_string(),
+                tickets: 10,
+            },
+            TestUser {
+                addr: "testUserB".to_string(),
+                tickets: 10,
+            },
+        ];
 
         let _ = instantiate(
             deps.as_mut(),
@@ -239,29 +286,6 @@ mod tests {
             TESTING_INST_MSG,
         )
         .unwrap();
-
-        struct TestUser {
-            pub addr: String,
-            pub tickets: u64,
-        }
-
-        let mut test_users = vec![];
-        test_users.push(TestUser {
-            addr: "creator".to_string(),
-            tickets: 1,
-        });
-        test_users.push(TestUser {
-            addr: "a".to_string(),
-            tickets: 10,
-        });
-        test_users.push(TestUser {
-            addr: "b".to_string(),
-            tickets: 10,
-        });
-        test_users.push(TestUser {
-            addr: "c".to_string(),
-            tickets: 10,
-        });
 
         for test_user in test_users {
             execute(
@@ -273,23 +297,13 @@ mod tests {
                 },
             )
             .unwrap();
+
+            let res =
+                query_ticket_count(deps.as_ref(), mock_env(), Addr::unchecked(test_user.addr));
+            assert!(res.is_ok());
+
+            let ticket_response = res.unwrap();
+            assert_eq!(ticket_response.tickets, Some(test_user.tickets));
         }
-
-        let res = query_ticket_count(deps.as_ref(), mock_env(), "creator".to_string());
-
-        assert!(res.is_ok());
-        let ticket_response = res.unwrap();
-        assert_eq!(ticket_response.tickets, Some(1));
-
-        /*
-        - When we buy and run the rando lottery we should have the ability to decide a winner,
-          and in this case we should have 1 winner.
-        */
-        let _ = execute(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("creator", &coins(1000, "earth")),
-            ExecuteLottery { seed: 124212 },
-        );
     }
 }

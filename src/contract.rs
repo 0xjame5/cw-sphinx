@@ -4,7 +4,6 @@ use std::ops::{Div, Mul, Range};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
 use cw2::set_contract_version;
-use cw_utils::Duration;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
 
@@ -197,10 +196,9 @@ pub fn query_ticket_count(deps: Deps, _env: Env, addr: Addr) -> StdResult<Ticket
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Addr, Uint128};
-    use cw_multi_test::App;
+    use cosmwasm_std::{coins, Addr};
 
-    use crate::msg::ExecuteMsg::{BuyTicket, ExecuteLottery};
+    use crate::msg::ExecuteMsg::BuyTicket;
     use crate::tests::common::{TestUser, TESTING_INST_MSG};
 
     use super::*;

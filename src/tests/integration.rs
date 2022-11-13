@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use crate::ContractError;
     use cosmwasm_std::{Addr, Coin, Empty, StdError, Uint128};
     use cw_multi_test::{App, AppBuilder, Contract, ContractWrapper, Executor};
 

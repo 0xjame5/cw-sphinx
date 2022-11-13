@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{Addr, Coin, Empty, StdError, Uint128};
-    use cw_multi_test::{App, AppBuilder, Contract, ContractWrapper, Executor};
+    use cosmwasm_std::{Addr, Empty};
+    use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 
-    use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+    use crate::tests::common::TESTING_INST_MSG;
 
     const USER: &str = "USER";
     const ADMIN: &str = "ADMIN";
@@ -26,6 +26,16 @@ mod tests {
     fn buy_tickets_and_lottery() {
         let mut app = mock_app();
         let lotto_code_id = app.store_code(contract_lotto());
+
+        app.instantiate_contract(
+            lotto_code_id,
+            Addr::unchecked(ADMIN),
+            &TESTING_INST_MSG,
+            &[],
+            "yolo",
+            None,
+        )
+        .unwrap();
 
         // how do i add a time dilation, such that we can update the stupid as contract.
         // let resp = execute(

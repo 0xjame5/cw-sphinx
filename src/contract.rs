@@ -159,8 +159,8 @@ fn create_player_ranges(deps: &DepsMut, total_tickets: u64) -> PlayerRanges {
 fn get_num_tickets(deps: &DepsMut) -> u64 {
     let players = get_player_ranges(deps);
     let mut total_num_tickets: u64 = 0;
-    for playersResult in players {
-        let (_addr, player_info) = playersResult.unwrap();
+    for player_results in players {
+        let (_addr, player_info) = player_results.unwrap();
         total_num_tickets += player_info.tickets
     }
     total_num_tickets
@@ -196,31 +196,14 @@ pub fn query_ticket_count(deps: Deps, _env: Env, addr: Addr) -> StdResult<Ticket
 
 #[cfg(test)]
 mod tests {
-
-    fn mock_app() -> App {
-        App::default()
-    }
-
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coins, Addr, Uint128};
     use cw_multi_test::App;
 
     use crate::msg::ExecuteMsg::{BuyTicket, ExecuteLottery};
+    use crate::tests::common::{TestUser, TESTING_INST_MSG};
 
     use super::*;
-
-    pub const TESTING_TICKET_COST: Uint128 = Uint128::new(1_000_000u128);
-    pub const TESTING_1_WEEK_IN_SECONDS: u64 = 604_800u64;
-    pub const TESTING_DURATION: Duration = Duration::Time(TESTING_1_WEEK_IN_SECONDS);
-    pub const TESTING_INST_MSG: InstantiateMsg = InstantiateMsg {
-        ticket_cost: TESTING_TICKET_COST,
-        lottery_duration: TESTING_DURATION,
-    };
-
-    pub struct TestUser {
-        pub addr: String,
-        pub tickets: u64,
-    }
 
     #[test]
     fn proper_initialization() {

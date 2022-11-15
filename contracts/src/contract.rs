@@ -74,11 +74,23 @@ fn execute_buy_ticket(
     info: MessageInfo,
     bought_tickets: u64,
 ) -> Result<Response, ContractError> {
-    // if a user is trying to buy a ticket, before doing so. check to see if the
+    // 1. if a user is trying to buy a ticket, before doing so.
+    // 2. check to see if the lottery itself is expired, if so update state.
+    let lottery_state = LOTTERY_STATE.load(deps.storage)?;
 
-    update_player(deps, &info, bought_tickets)?;
-
-    Ok(Response::new())
+    match lottery_state {
+        LotteryState::OPEN { expiration } => {
+            if expiration.is_expired(&_env.block) {
+                LOTTERY_STATE.save(deps.storage, &LotteryState::CHOOSING {})?;
+                Ok(Response::new())
+            } else {
+                update_player(deps, &info, bought_tickets)?;
+                Ok(Response::new())
+            }
+        }
+        LotteryState::CHOOSING => Err(ContractError::TicketBuyingNotAvailable {}),
+        LotteryState::CLOSED { .. } => Err(ContractError::TicketBuyingNotAvailable {}),
+    }
 }
 
 fn update_player(deps: DepsMut, info: &MessageInfo, bought_tickets: u64) -> StdResult<()> {

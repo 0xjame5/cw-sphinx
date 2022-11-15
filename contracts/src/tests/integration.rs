@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::msg::ExecuteMsg;
+    use crate::ContractError;
     use cosmwasm_std::{Addr, BlockInfo, Empty};
     use cw_multi_test::{App, Contract, ContractWrapper, Executor};
     use cw_utils::Duration;
@@ -49,8 +50,6 @@ mod tests {
             )
             .unwrap();
 
-        app.update_block(expire(TESTING_DURATION));
-
         let buy_ticket_exec_msg = ExecuteMsg::BuyTicket { num_tickets: 1 };
 
         let app_response_1 = app
@@ -62,6 +61,11 @@ mod tests {
             )
             .unwrap();
 
+        app.update_block(expire(TESTING_DURATION));
+
+        // Note that this would be empty, shit would return OK.
+        // This is because this would update the contract to next state. However,
+        // the next call would fail.
         let app_response_2 = app
             .execute_contract(
                 Addr::unchecked("TEST_USER_2"),
@@ -71,13 +75,19 @@ mod tests {
             )
             .unwrap();
 
-        // how do i add a time dilation, such that we can update the stupid as contract.
-        // let resp = execute(
-        //     deps.as_mut(),
-        //     mock_env(),
-        //     mock_info("creator", &coins(1000, "earth")),
-        //     ExecuteLottery { seed: 124212 },
-        // );
+        let app_resp_err = app
+            .execute_contract(
+                Addr::unchecked("TEST_USER_3"),
+                lotto_contract_addr.clone(),
+                &buy_ticket_exec_msg,
+                &[],
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            ContractError::TicketBuyingNotAvailable {},
+            app_resp_err.downcast().unwrap()
+        );
 
         // having app and then adding time dilation is the only way. fuck LOL
     }

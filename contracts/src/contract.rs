@@ -65,6 +65,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::BuyTicket { num_tickets } => execute_buy_ticket(deps, env, info, num_tickets),
         ExecuteMsg::ExecuteLottery { seed } => execute_lottery(deps, env, info, seed),
+        ExecuteMsg::ClaimTokens => execute_claim(deps, env, info),
     }
 }
 
@@ -129,6 +130,23 @@ fn execute_lottery(
     }
 }
 
+fn execute_claim(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo
+) -> Result<Response, ContractError> {
+    let lottery_state = LOTTERY_STATE.load(deps.storage)?;
+    match lottery_state {
+        LotteryState::CHOOSING => Err(ContractError::LotteryNotClaimable {}),
+        LotteryState::OPEN { .. } => Err(ContractError::LotteryNotClaimable {}),
+        LotteryState::CLOSED { winner } =>
+            // verify winner addr is actually the requester, if so.
+            // how do dao contracts pool in value. the pot. how much money is being stored?
+            Ok(Response::new())
+        ,
+    }
+}
+
 fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
     let mut rng = Pcg32::seed_from_u64(seed);
     let total_tickets = get_num_tickets(&deps);
@@ -149,6 +167,8 @@ fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
 
     LOTTERY_STATE.save(deps.storage, &LotteryState::CLOSED { winner })
 }
+
+
 
 fn create_player_ranges(deps: &DepsMut, total_tickets: u64) -> PlayerRanges {
     let mut player_ranges = PlayerRanges::create();

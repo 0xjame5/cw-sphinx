@@ -15,6 +15,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     BuyTicket { num_tickets: u64 },
     ExecuteLottery { seed: u64 },
+    ClaimTokens,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

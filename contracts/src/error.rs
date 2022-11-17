@@ -15,6 +15,9 @@ pub enum ContractError {
     #[error("The current lottery is not executable because it is decided or still open.")]
     LotteryNotExecutable {},
 
+    #[error("The current lottery is not in a state that rewards can be claimed.")]
+    LotteryNotClaimable {},
+
     #[error("Custom Error val: {val:?}")]
     CustomError { val: String },
 }

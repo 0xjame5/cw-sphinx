@@ -25,6 +25,7 @@ pub enum LotteryState {
     CHOOSING,
     CLOSED {
         winner: Addr,
+        claimed: bool,
     },
 }
 

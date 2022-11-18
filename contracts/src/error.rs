@@ -18,6 +18,13 @@ pub enum ContractError {
     #[error("The current lottery is not in a state that rewards can be claimed.")]
     LotteryNotClaimable {},
 
+
+    #[error("The current lottery winner has already claimed earnings")]
+    LotteryAlreadyClaimed {},
+
+    #[error("The current lottery winner has already claimed earnings")]
+    LotteryNotClaimedByCorrectUser {},
+
     #[error("Custom Error val: {val:?}")]
     CustomError { val: String },
 }

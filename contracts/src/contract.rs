@@ -133,17 +133,26 @@ fn execute_lottery(
 fn execute_claim(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo
+    info: MessageInfo,
 ) -> Result<Response, ContractError> {
+    /*
+     *
+     */
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
     match lottery_state {
         LotteryState::CHOOSING => Err(ContractError::LotteryNotClaimable {}),
         LotteryState::OPEN { .. } => Err(ContractError::LotteryNotClaimable {}),
-        LotteryState::CLOSED { winner } =>
-            // verify winner addr is actually the requester, if so.
-            // how do dao contracts pool in value. the pot. how much money is being stored?
-            Ok(Response::new())
-        ,
+        LotteryState::CLOSED { winner, claimed } =>
+            if !claimed {
+                if info.sender == winner {
+                    // send contract funds, and update lottery state to "closed and claimed"
+                    Ok(Response::new())
+                } else {
+                    Err(ContractError::LotteryNotClaimedByCorrectUser {})
+                }
+            } else {
+                Err(ContractError::LotteryAlreadyClaimed {})
+            }
     }
 }
 
@@ -165,9 +174,8 @@ fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
 
     let winner = addr.unwrap();
 
-    LOTTERY_STATE.save(deps.storage, &LotteryState::CLOSED { winner })
+    LOTTERY_STATE.save(deps.storage, &LotteryState::CLOSED { winner, claimed: false })
 }
-
 
 
 fn create_player_ranges(deps: &DepsMut, total_tickets: u64) -> PlayerRanges {
@@ -253,7 +261,7 @@ mod tests {
             mock_info("creator", &coins(1000, "earth")),
             TESTING_INST_MSG,
         )
-        .unwrap();
+            .unwrap();
 
         let _ = execute(
             deps.as_mut(),
@@ -261,7 +269,7 @@ mod tests {
             mock_info("creator", &coins(1000, "earth")),
             BuyTicket { num_tickets: 1 },
         )
-        .unwrap();
+            .unwrap();
 
         let res = query_ticket_count(
             deps.as_ref(),
@@ -298,7 +306,7 @@ mod tests {
             mock_info("creator", &coins(1000, "earth")),
             TESTING_INST_MSG,
         )
-        .unwrap();
+            .unwrap();
 
         for test_user in test_users {
             execute(
@@ -309,7 +317,7 @@ mod tests {
                     num_tickets: test_user.tickets,
                 },
             )
-            .unwrap();
+                .unwrap();
 
             let res =
                 query_ticket_count(deps.as_ref(), mock_env(), Addr::unchecked(test_user.addr));

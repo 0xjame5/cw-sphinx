@@ -24,7 +24,7 @@ jobs:
       - name: Run unit tests
         uses: actions-rs/cargo@v1
         with:
-          command: unit-test
+          command: cd contracts && unit-test
           args: --locked
         env:
           RUST_BACKTRACE: 1
@@ -32,7 +32,7 @@ jobs:
       - name: Compile WASM contract
         uses: actions-rs/cargo@v1
         with:
-          command: wasm
+          command: cd contracts && wasm
           args: --locked
         env:
           RUSTFLAGS: "-C link-arg=-s"

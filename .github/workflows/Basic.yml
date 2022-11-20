@@ -9,7 +9,12 @@ jobs:
   test:
     name: Test Suite
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./contracts
     steps:
+      - name: "Switch directories"
+
       - name: Checkout sources
         uses: actions/checkout@v2
 

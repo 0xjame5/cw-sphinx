@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./contracts
+        working-directory: contracts
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2 

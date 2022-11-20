@@ -25,7 +25,6 @@ jobs:
           args: --locked
         env:
           RUST_BACKTRACE: 1
-        working-directory: contracts
 
       - name: Compile WASM contract
         uses: actions-rs/cargo@v1
@@ -34,7 +33,6 @@ jobs:
           args: --locked
         env:
           RUSTFLAGS: "-C link-arg=-s"
-        working-directory: contracts
 
   lints:
     name: Lints

@@ -157,6 +157,7 @@ fn execute_claim(
 }
 
 fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
+
     let mut rng = Pcg32::seed_from_u64(seed);
     let total_tickets = get_num_tickets(&deps);
     let winner_ticket = rng.gen_range(Range {
@@ -166,7 +167,7 @@ fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
     let player_ranges = create_player_ranges(&deps, total_tickets);
 
     let mut addr = None;
-    for player_range in player_ranges.0 {
+    for player_range in player_ranges.ranges {
         if winner_ticket <= player_range.end_range && winner_ticket >= player_range.start_range {
             addr = Some(player_range.player_addr)
         }

@@ -1,8 +1,10 @@
-pub struct PlayerRanges(pub Vec<PlayerRange>);
+pub struct PlayerRanges {
+    pub ranges: Vec<PlayerRange>,
+}
 
 impl PlayerRanges {
     pub fn create() -> PlayerRanges {
-        PlayerRanges { 0: vec![] }
+        PlayerRanges { ranges: vec![] }
     }
 
     pub fn create_player_range(&mut self, addr: cosmwasm_std::Addr, start: u64, end: u64) -> () {
@@ -11,7 +13,7 @@ impl PlayerRanges {
             start_range: start,
             end_range: end,
         };
-        self.0.push(player_range)
+        self.ranges.push(player_range)
     }
 }
 

@@ -8,9 +8,6 @@ jobs:
   test:
     name: Test Suite
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: contracts
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2 
@@ -28,6 +25,7 @@ jobs:
           args: --locked
         env:
           RUST_BACKTRACE: 1
+        working-directory: contracts
 
       - name: Compile WASM contract
         uses: actions-rs/cargo@v1
@@ -36,6 +34,7 @@ jobs:
           args: --locked
         env:
           RUSTFLAGS: "-C link-arg=-s"
+        working-directory: contracts
 
   lints:
     name: Lints

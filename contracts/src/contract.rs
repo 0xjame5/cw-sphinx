@@ -53,7 +53,6 @@ There are three states of the lottery.
 
 After choosing a closed vote, a winner should be able to then execute a function on the contract
 to retrieve their assets. 1% of the rewards will be set to the DAO treasury for continued deving.
-""
 */
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
@@ -81,11 +80,14 @@ fn execute_buy_ticket(
 
     match lottery_state {
         LotteryState::OPEN { expiration } => {
-            if expiration.is_expired(&_env.block) {
-                LOTTERY_STATE.save(deps.storage, &LotteryState::CHOOSING {})?;
+            if !(expiration.is_expired(&_env.block)) {
+                // take the amount of tokens sent, and verify its the amount needed.
+                // should be an exact amount.
+
+                update_player(deps, &info, bought_tickets)?;
                 Ok(Response::new())
             } else {
-                update_player(deps, &info, bought_tickets)?;
+                LOTTERY_STATE.save(deps.storage, &LotteryState::CHOOSING {})?;
                 Ok(Response::new())
             }
         }

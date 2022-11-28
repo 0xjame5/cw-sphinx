@@ -10,7 +10,7 @@ pub struct TestUser {
     pub tickets: u64,
 }
 
-pub const ADMIN: &str = "ADMIN";
+pub const TEST_ADMIN: &str = "ADMIN";
 pub const TEST_USER_1: &str = "USER1";
 pub const TEST_USER_2: &str = "USER2";
 

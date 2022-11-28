@@ -6,7 +6,7 @@ mod tests {
 
     use crate::ContractError;
     use crate::msg::{ExecuteMsg, InstantiateMsg};
-    use crate::tests::common::{TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, ADMIN};
+    use crate::tests::common::{TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN};
 
     fn expire(voting_period: Duration) -> impl Fn(&mut BlockInfo) {
         move |block: &mut BlockInfo| {
@@ -16,9 +16,6 @@ mod tests {
             };
         }
     }
-
-
-
 
     fn mock_app() -> App {
         App::default()
@@ -46,7 +43,7 @@ mod tests {
         let lotto_contract_addr = app
             .instantiate_contract(
                 lotto_code_id,
-                Addr::unchecked(ADMIN),
+                Addr::unchecked(TEST_ADMIN),
                 &instantiate_message,
                 &[],
                 "yolo",

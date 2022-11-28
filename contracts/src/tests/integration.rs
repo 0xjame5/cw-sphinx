@@ -1,10 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use crate::msg::ExecuteMsg;
-    use crate::ContractError;
-    use cosmwasm_std::{Addr, BlockInfo, Empty};
+    use cosmwasm_std::{Addr, BlockInfo, coin, Empty};
     use cw_multi_test::{App, Contract, ContractWrapper, Executor};
     use cw_utils::Duration;
+
+    use crate::ContractError;
+    use crate::msg::{ExecuteMsg, InstantiateMsg};
+    use crate::tests::common::{TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, ADMIN};
 
     fn expire(voting_period: Duration) -> impl Fn(&mut BlockInfo) {
         move |block: &mut BlockInfo| {
@@ -15,11 +17,8 @@ mod tests {
         }
     }
 
-    use crate::tests::common::{TESTING_DURATION, TESTING_INST_MSG};
 
-    const USER: &str = "USER";
-    const ADMIN: &str = "ADMIN";
-    const NATIVE_DENOM: &str = "denom";
+
 
     fn mock_app() -> App {
         App::default()
@@ -39,11 +38,16 @@ mod tests {
         let mut app = mock_app();
         let lotto_code_id = app.store_code(contract_lotto());
 
+        let instantiate_message = InstantiateMsg {
+            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM ),
+            lottery_duration: TESTING_DURATION,
+        };
+
         let lotto_contract_addr = app
             .instantiate_contract(
                 lotto_code_id,
                 Addr::unchecked(ADMIN),
-                &TESTING_INST_MSG,
+                &instantiate_message,
                 &[],
                 "yolo",
                 None,
@@ -88,7 +92,5 @@ mod tests {
             ContractError::TicketBuyingNotAvailable {},
             app_resp_err.downcast().unwrap()
         );
-
-        // having app and then adding time dilation is the only way. fuck LOL
     }
 }

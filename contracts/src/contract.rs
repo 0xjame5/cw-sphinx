@@ -12,7 +12,7 @@ use crate::error::ContractError;
 use crate::helpers::get_player_ranges;
 use crate::models::PlayerRanges;
 use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
-use crate::state::{Config, LotteryState, PlayerInfo, CONFIG, LOTTERY_STATE, PLAYERS};
+use crate::state::{LotteryState, PlayerInfo, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST};
 
 /*
 Each individual contract owner will be able to creat their own ticket cost. We require it to be
@@ -27,11 +27,11 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let config = Config {
-        cost_per_ticket: msg.ticket_cost,
-    };
+    // make sure ticket cost is greater than 0, or that it's a native
+    // token. or apart of some predefined white list.
+    let cost_per_ticket = msg.ticket_cost;
+    TICKET_UNIT_COST.save(deps.storage,&cost_per_ticket)?;
 
-    CONFIG.save(deps.storage, &config)?;
 
     LOTTERY_STATE.save(
         deps.storage,
@@ -135,13 +135,9 @@ fn execute_claim(
     _env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    /*
-     *
-     */
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
+
     match lottery_state {
-        LotteryState::CHOOSING => Err(ContractError::LotteryNotClaimable {}),
-        LotteryState::OPEN { .. } => Err(ContractError::LotteryNotClaimable {}),
         LotteryState::CLOSED { winner, claimed } =>
             if !claimed {
                 if info.sender == winner {
@@ -153,6 +149,8 @@ fn execute_claim(
             } else {
                 Err(ContractError::LotteryAlreadyClaimed {})
             }
+        LotteryState::CHOOSING => Err(ContractError::LotteryNotClaimable {}),
+        LotteryState::OPEN { .. } => Err(ContractError::LotteryNotClaimable {}),
     }
 }
 
@@ -237,40 +235,48 @@ pub fn query_ticket_count(deps: Deps, _env: Env, addr: Addr) -> StdResult<Ticket
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Addr};
+    use cosmwasm_std::{coins, Addr, coin};
 
     use crate::msg::ExecuteMsg::BuyTicket;
-    use crate::tests::common::{TestUser, TESTING_INST_MSG};
+    use crate::tests::common::{TestUser, TESTING_TICKET_COST, TESTING_NATIVE_DENOM, TESTING_DURATION};
 
     use super::*;
 
     #[test]
     fn proper_initialization() {
+        let instantiate_message = InstantiateMsg {
+            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM ),
+            lottery_duration: TESTING_DURATION,
+        };
+
         let mut deps = mock_dependencies();
         let info = mock_info("creator", &coins(1000, "earth"));
-        let res = instantiate(deps.as_mut(), mock_env(), info, TESTING_INST_MSG.clone()).unwrap();
+        let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_message).unwrap();
         assert_eq!(0, res.messages.len());
     }
 
     #[test]
     fn buy_tickets() {
+        let instantiate_message = InstantiateMsg {
+            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM ),
+            lottery_duration: TESTING_DURATION,
+        };
+
         let mut deps = mock_dependencies();
 
         let _ = instantiate(
             deps.as_mut(),
             mock_env(),
             mock_info("creator", &coins(1000, "earth")),
-            TESTING_INST_MSG,
-        )
-            .unwrap();
+            instantiate_message,
+        ).unwrap();
 
         let _ = execute(
             deps.as_mut(),
             mock_env(),
             mock_info("creator", &coins(1000, "earth")),
             BuyTicket { num_tickets: 1 },
-        )
-            .unwrap();
+        ).unwrap();
 
         let res = query_ticket_count(
             deps.as_ref(),
@@ -286,6 +292,12 @@ mod tests {
     #[test]
     fn buy_multiple_tickets() {
         let mut deps = mock_dependencies();
+
+        let instantiate_message = InstantiateMsg {
+            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM ),
+            lottery_duration: TESTING_DURATION,
+        };
+
         let test_users = vec![
             TestUser {
                 addr: "creator".to_string(),
@@ -305,7 +317,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("creator", &coins(1000, "earth")),
-            TESTING_INST_MSG,
+            instantiate_message,
         )
             .unwrap();
 

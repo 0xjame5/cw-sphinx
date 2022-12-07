@@ -1,0 +1,11 @@
+/Users/james/workspace/cw-lootboxes/contracts/target/debug/deps/ed25519_zebra-988f51579537426c.rmeta: /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/lib.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/batch.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/error.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/signature.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/signing_key.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/verification_key.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/../README.md
+
+/Users/james/workspace/cw-lootboxes/contracts/target/debug/deps/ed25519_zebra-988f51579537426c.d: /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/lib.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/batch.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/error.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/signature.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/signing_key.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/verification_key.rs /Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/../README.md
+
+/Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/lib.rs:
+/Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/batch.rs:
+/Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/error.rs:
+/Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/signature.rs:
+/Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/signing_key.rs:
+/Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/verification_key.rs:
+/Users/james/.cargo/registry/src/github.com-1ecc6299db9ec823/ed25519-zebra-3.0.0/src/../README.md:

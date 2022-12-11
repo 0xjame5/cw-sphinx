@@ -3,7 +3,8 @@ on: [push, pull_request]
 name: Basic
 
 jobs:
-    test:
+
+  test:
     name: Test Suite
     runs-on: ubuntu-latest
     steps:

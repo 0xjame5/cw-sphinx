@@ -1,12 +1,14 @@
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{Addr, BlockInfo, coin, Empty};
+    use cosmwasm_std::{coin, Addr, BlockInfo, Empty};
     use cw_multi_test::{App, Contract, ContractWrapper, Executor};
     use cw_utils::Duration;
 
-    use crate::ContractError;
     use crate::msg::{ExecuteMsg, InstantiateMsg};
-    use crate::tests::common::{TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN};
+    use crate::tests::common::{
+        TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN,
+    };
+    use crate::ContractError;
 
     fn expire(voting_period: Duration) -> impl Fn(&mut BlockInfo) {
         move |block: &mut BlockInfo| {
@@ -36,7 +38,7 @@ mod tests {
         let lotto_code_id = app.store_code(contract_lotto());
 
         let instantiate_message = InstantiateMsg {
-            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM ),
+            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
         };
 

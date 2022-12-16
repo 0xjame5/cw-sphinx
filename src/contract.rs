@@ -2,7 +2,9 @@ use std::ops::{Div, Mul, Range};
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128};
+use cosmwasm_std::{
+    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+};
 use cw2::set_contract_version;
 use cw_utils::{must_pay, PaymentError};
 use rand::{Rng, SeedableRng};
@@ -31,8 +33,7 @@ pub fn instantiate(
     // make sure ticket cost is greater than 0, or that it's a native
     // token. or apart of some predefined white list.
     let cost_per_ticket = msg.ticket_cost;
-    TICKET_UNIT_COST.save(deps.storage,&cost_per_ticket)?;
-
+    TICKET_UNIT_COST.save(deps.storage, &cost_per_ticket)?;
 
     LOTTERY_STATE.save(
         deps.storage,
@@ -89,32 +90,16 @@ fn execute_buy_ticket(
                 let cost = ticket_cost.amount * Uint128::from(bought_tickets);
 
                 // returns amount of denom wanted.
-                let amount_received = must_pay(&info, &ticket_cost.denom);
+                let amount_received_future = must_pay(&info, &ticket_cost.denom);
 
-                match amount_received {
-                    Ok(val) => {
+                let amount_rematch = match amount_received_future {
+                    Ok(val) => Ok(val),
+                    Err(_) => Err(ContractError::TicketBuyingNotEnoughFunds {}),
+                };
 
-                    }
-                    Err(e) => {
-                        match e {
-                            PaymentError::MissingDenom(_) => {
-                                Err()
-                            }
-                            PaymentError::ExtraDenom(_) => {}
-                            PaymentError::MultipleDenoms { .. } => {}
-                            PaymentError::NoFunds { .. } => {}
-                            PaymentError::NonPayable { .. } => {}
-                        }
+                let amount_received_fut = amount_rematch?;
 
-                    }
-                }
-
-                // match amount_received {
-                //     Ok(_) => {}
-                //     Err(_) => {}
-                // }
-
-                if cost != amount_received {
+                if cost != amount_received_fut {
                     Err(ContractError::TicketBuyingNotEnoughFunds {})
                 } else {
                     update_player(deps, &info, bought_tickets)?;
@@ -168,15 +153,11 @@ fn execute_lottery(
     }
 }
 
-fn execute_claim(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-) -> Result<Response, ContractError> {
+fn execute_claim(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
 
     match lottery_state {
-        LotteryState::CLOSED { winner, claimed } =>
+        LotteryState::CLOSED { winner, claimed } => {
             if !claimed {
                 if info.sender == winner {
                     // send contract funds, and update lottery state to "closed and claimed"
@@ -187,13 +168,13 @@ fn execute_claim(
             } else {
                 Err(ContractError::LotteryAlreadyClaimed {})
             }
+        }
         LotteryState::CHOOSING => Err(ContractError::LotteryNotClaimable {}),
         LotteryState::OPEN { .. } => Err(ContractError::LotteryNotClaimable {}),
     }
 }
 
 fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
-
     let mut rng = Pcg32::seed_from_u64(seed);
     let total_tickets = get_num_tickets(&deps);
     let winner_ticket = rng.gen_range(Range {
@@ -211,9 +192,14 @@ fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
 
     let winner = addr.unwrap();
 
-    LOTTERY_STATE.save(deps.storage, &LotteryState::CLOSED { winner, claimed: false })
+    LOTTERY_STATE.save(
+        deps.storage,
+        &LotteryState::CLOSED {
+            winner,
+            claimed: false,
+        },
+    )
 }
-
 
 fn create_player_ranges(deps: &DepsMut, total_tickets: u64) -> PlayerRanges {
     let mut player_ranges = PlayerRanges::create();
@@ -273,17 +259,19 @@ pub fn query_ticket_count(deps: Deps, _env: Env, addr: Addr) -> StdResult<Ticket
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, Addr, coin};
+    use cosmwasm_std::{coin, coins, Addr};
 
     use crate::msg::ExecuteMsg::BuyTicket;
-    use crate::tests::common::{TestUser, TESTING_TICKET_COST, TESTING_NATIVE_DENOM, TESTING_DURATION};
+    use crate::tests::common::{
+        TestUser, TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST,
+    };
 
     use super::*;
 
     #[test]
     fn proper_initialization() {
         let instantiate_message = InstantiateMsg {
-            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM ),
+            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
         };
 
@@ -296,7 +284,7 @@ mod tests {
     #[test]
     fn buy_tickets() {
         let instantiate_message = InstantiateMsg {
-            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM ),
+            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
         };
 
@@ -307,14 +295,16 @@ mod tests {
             mock_env(),
             mock_info("creator", &coins(1000, "earth")),
             instantiate_message,
-        ).unwrap();
+        )
+        .unwrap();
 
         let _ = execute(
             deps.as_mut(),
             mock_env(),
             mock_info("creator", &coins(1000, "earth")),
             BuyTicket { num_tickets: 1 },
-        ).unwrap();
+        )
+        .unwrap();
 
         let res = query_ticket_count(
             deps.as_ref(),
@@ -332,7 +322,7 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let instantiate_message = InstantiateMsg {
-            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM ),
+            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
         };
 
@@ -357,7 +347,7 @@ mod tests {
             mock_info("creator", &coins(1000, "earth")),
             instantiate_message,
         )
-            .unwrap();
+        .unwrap();
 
         for test_user in test_users {
             execute(
@@ -368,7 +358,7 @@ mod tests {
                     num_tickets: test_user.tickets,
                 },
             )
-                .unwrap();
+            .unwrap();
 
             let res =
                 query_ticket_count(deps.as_ref(), mock_env(), Addr::unchecked(test_user.addr));

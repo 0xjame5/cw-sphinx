@@ -7,7 +7,7 @@ impl PlayerRanges {
         PlayerRanges { ranges: vec![] }
     }
 
-    pub fn create_player_range(&mut self, addr: cosmwasm_std::Addr, start: u64, end: u64) -> () {
+    pub fn create_player_range(&mut self, addr: cosmwasm_std::Addr, start: u64, end: u64) {
         let player_range = PlayerRange {
             player_addr: addr,
             start_range: start,

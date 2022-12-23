@@ -114,6 +114,7 @@ fn execute_buy_ticket(
                 // update_player(deps, &info, bought_tickets)?;
                 Ok(Response::new())
                 // }
+
             } else {
                 // Lottery is expired, therefore go ahead and update the state of the contract
                 // to next phase.

@@ -3,10 +3,11 @@ use std::ops::{Div, Mul, Range};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, OverflowError, Response, StdResult,
+    Uint128,
 };
 use cw2::set_contract_version;
-use cw_utils::{must_pay, PaymentError};
+use cw_utils::must_pay;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
 
@@ -16,6 +17,7 @@ use crate::helpers::get_player_ranges;
 use crate::models::PlayerRanges;
 use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
 use crate::state::{LotteryState, PlayerInfo, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST};
+use crate::ContractError::PaymentError;
 
 /*
 Each individual contract owner will be able to creat their own ticket cost. We require it to be
@@ -86,25 +88,32 @@ fn execute_buy_ticket(
                 // Take the amount of tokens sent, and verify its the amount needed.
                 // Should be an exact amount.
                 let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
+                // let bought_tickets_convert = u128::from(bought_tickets);
+                // let bought_tickets_U128 = Uint128::new(bought_tickets_convert);
 
-                let cost = ticket_cost.amount * Uint128::from(bought_tickets);
+                // let cost = ticket_cost.amount.checked_mul(bought_tickets_U128);
+
+                // let ex_cost = match cost {
+                //     Ok(val) => Ok(val),
+                //     Err(_) => Err(ContractError::PaymentError {}),
+                // }?;
 
                 // returns amount of denom wanted.
-                let amount_received_future = must_pay(&info, &ticket_cost.denom);
+                // let amount_received_future = must_pay(&info, &ticket_cost.denom);
+                //
+                // let amount_rematch = match amount_received_future {
+                //     Ok(val) => Ok(val),
+                //     Err(_) => Err(ContractError::TicketBuyingNotEnoughFunds {}),
+                // };
 
-                let amount_rematch = match amount_received_future {
-                    Ok(val) => Ok(val),
-                    Err(_) => Err(ContractError::TicketBuyingNotEnoughFunds {}),
-                };
+                // let amount_received_fut = amount_rematch?;
 
-                let amount_received_fut = amount_rematch?;
-
-                if cost != amount_received_fut {
-                    Err(ContractError::TicketBuyingNotEnoughFunds {})
-                } else {
-                    update_player(deps, &info, bought_tickets)?;
-                    Ok(Response::new())
-                }
+                // if ex_cost != amount_received_fut {
+                //     Err(ContractError::TicketBuyingNotEnoughFunds {})
+                // } else {
+                // update_player(deps, &info, bought_tickets)?;
+                Ok(Response::new())
+                // }
             } else {
                 // Lottery is expired, therefore go ahead and update the state of the contract
                 // to next phase.

@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::{coin, Addr, BlockInfo, Empty};
+    use cosmwasm_std::{coin, Addr, BlockInfo, Coin, Empty, Uint128};
     use cw_multi_test::{App, Contract, ContractWrapper, Executor};
     use cw_utils::Duration;
 
@@ -19,8 +19,11 @@ mod tests {
         }
     }
 
-    fn mock_app() -> App {
-        App::default()
+    fn mock_app(owner: Addr, coins: Vec<Coin>) -> App {
+        App::new(|router, _, storage| {
+            // initialization moved to App construction
+            router.bank.init_balance(storage, &owner, coins).unwrap()
+        })
     }
 
     pub fn contract_lotto() -> Box<dyn Contract<Empty>> {
@@ -34,7 +37,23 @@ mod tests {
 
     #[test]
     fn instantiate_buy_tickets_and_execute() {
-        let mut app = mock_app();
+        let mut app = mock_app(
+            Addr::unchecked(TEST_ADMIN.clone()),
+            vec![Coin {
+                denom: TESTING_NATIVE_DENOM.to_string(),
+                amount: Uint128::new(100_000_000_000u128),
+            }],
+        );
+
+        app.send_tokens(
+            Addr::unchecked(TEST_ADMIN.clone()),
+            Addr::unchecked("TEST_USER_1"),
+            &[Coin {
+                denom: TESTING_NATIVE_DENOM.to_string(),
+                amount: Uint128::new(100_000u128),
+            }],
+        )
+        .unwrap();
         let lotto_code_id = app.store_code(contract_lotto());
 
         let instantiate_message = InstantiateMsg {
@@ -54,13 +73,16 @@ mod tests {
             .unwrap();
 
         let buy_ticket_exec_msg = ExecuteMsg::BuyTicket { num_tickets: 1 };
-
+        let testing_ticket_cost = Uint128::new(TESTING_TICKET_COST);
         let app_response_1 = app
             .execute_contract(
                 Addr::unchecked("TEST_USER_1"),
                 lotto_contract_addr.clone(),
                 &buy_ticket_exec_msg,
-                &[],
+                &[Coin {
+                    denom: TESTING_NATIVE_DENOM.to_string(),
+                    amount: Uint128::new(100u128),
+                }],
             )
             .unwrap();
 

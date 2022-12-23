@@ -1,39 +1,39 @@
+use crate::state::LotteryState;
+use cosmwasm_schema::cw_serde;
+use cosmwasm_schema::QueryResponses;
 use cosmwasm_std::{Addr, Coin};
 use cw_utils::Duration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::state::LotteryState;
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct InstantiateMsg {
     pub ticket_cost: Coin,
     pub lottery_duration: Duration,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg {
     BuyTicket { num_tickets: u64 },
     ExecuteLottery { seed: u64 },
     ClaimTokens,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
+    #[returns(TicketResponse)]
     TicketCount { addr: Addr },
+    #[returns(LotteryStateResponse)]
     LotteryState,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub struct TicketResponse {
     pub tickets: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub struct LotteryStateResponse {
     pub lotto_state: LotteryState,
 }

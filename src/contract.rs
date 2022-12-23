@@ -88,10 +88,10 @@ fn execute_buy_ticket(
                 // Take the amount of tokens sent, and verify its the amount needed.
                 // Should be an exact amount.
                 let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
-                // let bought_tickets_convert = u128::from(bought_tickets);
-                // let bought_tickets_U128 = Uint128::new(bought_tickets_convert);
+                let bought_tickets_convert = u128::from(bought_tickets);
+                let bought_tickets_U128 = Uint128::new(bought_tickets_convert);
 
-                // let cost = ticket_cost.amount.checked_mul(bought_tickets_U128);
+                let cost = ticket_cost.amount.checked_mul(bought_tickets_U128);
 
                 // let ex_cost = match cost {
                 //     Ok(val) => Ok(val),
@@ -111,10 +111,9 @@ fn execute_buy_ticket(
                 // if ex_cost != amount_received_fut {
                 //     Err(ContractError::TicketBuyingNotEnoughFunds {})
                 // } else {
-                // update_player(deps, &info, bought_tickets)?;
+                update_player(deps, &info, bought_tickets)?;
                 Ok(Response::new())
                 // }
-
             } else {
                 // Lottery is expired, therefore go ahead and update the state of the contract
                 // to next phase.

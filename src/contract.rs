@@ -2,8 +2,11 @@ use std::ops::{Div, Mul, Range};
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+};
 use cw2::set_contract_version;
+use cw_utils::{must_pay, Expiration};
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
 
@@ -76,48 +79,44 @@ fn execute_buy_ticket(
     // 1. if a user is trying to buy a ticket, before doing so.
     // 2. check to see if the lottery itself is expired, if so update state.
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
-
     match lottery_state {
         LotteryState::OPEN { expiration } => {
-            if !(expiration.is_expired(&_env.block)) {
-                // Take the amount of tokens sent, and verify its the amount needed.
-                // Should be an exact amount.
-                // let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
-                // let bought_tickets_convert = u128::from(bought_tickets);
-                // let bought_tickets_U128 = Uint128::new(bought_tickets_convert);
-
-                // let cost = ticket_cost.amount.checked_mul(bought_tickets_U128);
-
-                // let ex_cost = match cost {
-                //     Ok(val) => Ok(val),
-                //     Err(_) => Err(ContractError::PaymentError {}),
-                // }?;
-
-                // returns amount of denom wanted.
-                // let amount_received_future = must_pay(&info, &ticket_cost.denom);
-                //
-                // let amount_rematch = match amount_received_future {
-                //     Ok(val) => Ok(val),
-                //     Err(_) => Err(ContractError::TicketBuyingNotEnoughFunds {}),
-                // };
-
-                // let amount_received_fut = amount_rematch?;
-
-                // if ex_cost != amount_received_fut {
-                //     Err(ContractError::TicketBuyingNotEnoughFunds {})
-                // } else {
-                update_player(deps, &info, bought_tickets)?;
-                Ok(Response::new())
-                // }
-            } else {
-                // Lottery is expired, therefore go ahead and update the state of the contract
-                // to next phase.
-                LOTTERY_STATE.save(deps.storage, &LotteryState::CHOOSING {})?;
-                Ok(Response::new())
-            }
+            handle_open_lottery(deps, &_env, &info, bought_tickets, expiration)
         }
         LotteryState::CHOOSING => Err(ContractError::TicketBuyingNotAvailable {}),
         LotteryState::CLOSED { .. } => Err(ContractError::TicketBuyingNotAvailable {}),
+    }
+}
+
+fn handle_open_lottery(
+    deps: DepsMut,
+    env: &Env,
+    info: &MessageInfo,
+    bought_tickets: u64,
+    expiration: Expiration,
+) -> Result<Response, ContractError> {
+    if !(expiration.is_expired(&env.block)) {
+        // Take the amount of tokens sent, and verify its the amount needed.
+        // Should be an exact amount.
+        let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
+
+        let total_cost = ticket_cost
+            .amount
+            .checked_mul(Uint128::new(u128::from(bought_tickets)))?;
+
+        let amount_received_future = must_pay(&info, &ticket_cost.denom)?;
+
+        if amount_received_future == total_cost {
+            update_player(deps, &info, bought_tickets)?;
+            Ok(Response::new())
+        } else {
+            Err(ContractError::TicketBuyingIncorrectAmount {})
+        }
+    } else {
+        // Lottery is expired, therefore go ahead and update the state of the contract
+        // to next phase.
+        LOTTERY_STATE.save(deps.storage, &LotteryState::CHOOSING {})?;
+        Ok(Response::new())
     }
 }
 
@@ -302,7 +301,7 @@ mod tests {
         let _ = execute(
             deps.as_mut(),
             mock_env(),
-            mock_info("creator", &coins(1000, "earth")),
+            mock_info("creator", &coins(1000, TESTING_NATIVE_DENOM)),
             BuyTicket { num_tickets: 1 },
         )
         .unwrap();

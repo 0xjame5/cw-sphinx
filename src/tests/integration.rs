@@ -74,7 +74,7 @@ mod tests {
             .unwrap();
 
         let buy_ticket_exec_msg = ExecuteMsg::BuyTicket { num_tickets: 1 };
-        let testing_ticket_cost = Uint128::new(TESTING_TICKET_COST);
+
         let app_response_1 = app
             .execute_contract(
                 Addr::unchecked("TEST_USER_1"),
@@ -82,7 +82,7 @@ mod tests {
                 &buy_ticket_exec_msg,
                 &[Coin {
                     denom: TESTING_NATIVE_DENOM.to_string(),
-                    amount: Uint128::new(100u128),
+                    amount: Uint128::new(1000u128),
                 }],
             )
             .unwrap();

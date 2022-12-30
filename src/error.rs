@@ -4,8 +4,12 @@ use thiserror::Error;
 pub enum ContractError {
     #[error("{0}")]
     Std(cosmwasm_std::StdError),
+
     #[error("{0}")]
     OverFlowError(cosmwasm_std::OverflowError),
+
+    #[error("{0}")]
+    PaymentError(cw_utils::PaymentError),
 
     #[error("Unauthorized")]
     Unauthorized {},
@@ -30,20 +34,11 @@ pub enum ContractError {
 
     #[error("Custom Error val: {val:?}")]
     CustomError { val: String },
-
-    #[error("Payment Error")]
-    PaymentError {},
 }
 
 impl From<cw_utils::PaymentError> for ContractError {
     fn from(err: cw_utils::PaymentError) -> Self {
-        match err {
-            cw_utils::PaymentError::MissingDenom(_) => ContractError::PaymentError {},
-            cw_utils::PaymentError::ExtraDenom(_) => ContractError::PaymentError {},
-            cw_utils::PaymentError::MultipleDenoms { .. } => ContractError::PaymentError {},
-            cw_utils::PaymentError::NoFunds { .. } => ContractError::PaymentError {},
-            cw_utils::PaymentError::NonPayable { .. } => ContractError::PaymentError {},
-        }
+        ContractError::PaymentError(err)
     }
 }
 

@@ -1,3 +1,4 @@
+use cosmwasm_std::Coin;
 use cw_utils::Duration;
 
 pub const TESTING_NATIVE_DENOM: &str = "ulotto";
@@ -8,6 +9,7 @@ pub const TESTING_DURATION: Duration = Duration::Time(TESTING_1_WEEK_IN_SECONDS)
 pub struct TestUser {
     pub addr: String,
     pub tickets: u64,
+    pub coin: Coin,
 }
 
 pub const TEST_ADMIN: &str = "ADMIN";

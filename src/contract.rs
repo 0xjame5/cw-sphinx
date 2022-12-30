@@ -248,9 +248,7 @@ pub fn query_lottery_state(deps: Deps, _env: Env) -> StdResult<LotteryStateRespo
 
 pub fn query_ticket_count(deps: Deps, _env: Env, addr: Addr) -> StdResult<TicketResponse> {
     let res = PLAYERS.may_load(deps.storage, &addr)?;
-
     let tickets_opt: Option<u64> = res.map(|player_info| player_info.tickets);
-
     Ok(TicketResponse {
         tickets: tickets_opt,
     })
@@ -330,14 +328,17 @@ mod tests {
             TestUser {
                 addr: "creator".to_string(),
                 tickets: 1,
+                coin: coin(TESTING_TICKET_COST * 1, TESTING_NATIVE_DENOM),
             },
             TestUser {
                 addr: "testUserA".to_string(),
                 tickets: 10,
+                coin: coin(TESTING_TICKET_COST * 10, TESTING_NATIVE_DENOM),
             },
             TestUser {
                 addr: "testUserB".to_string(),
                 tickets: 10,
+                coin: coin(TESTING_TICKET_COST * 10, TESTING_NATIVE_DENOM),
             },
         ];
 
@@ -353,7 +354,7 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(&test_user.addr, &coins(1000, "earth")),
+                mock_info(&test_user.addr, &[test_user.coin]),
                 BuyTicket {
                     num_tickets: test_user.tickets,
                 },

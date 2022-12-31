@@ -113,5 +113,7 @@ mod tests {
             ContractError::TicketBuyingNotAvailable {},
             app_resp_err.downcast().unwrap()
         );
+
+        // execute the app endpoint to execute the lottery, let's see how this goes
     }
 }

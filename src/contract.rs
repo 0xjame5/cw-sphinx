@@ -30,10 +30,8 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // make sure ticket cost is greater than 0, or that it's a native
-    // token. or apart of some predefined white list.
-    let cost_per_ticket = msg.ticket_cost;
-    TICKET_UNIT_COST.save(deps.storage, &cost_per_ticket)?;
+    // TODO (James): make sure ticket cost is greater than 0 or throw err
+    TICKET_UNIT_COST.save(deps.storage, &msg.ticket_cost)?;
 
     LOTTERY_STATE.save(
         deps.storage,
@@ -76,8 +74,6 @@ fn execute_buy_ticket(
     info: MessageInfo,
     bought_tickets: u64,
 ) -> Result<Response, ContractError> {
-    // 1. if a user is trying to buy a ticket, before doing so.
-    // 2. check to see if the lottery itself is expired, if so update state.
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
     match lottery_state {
         LotteryState::OPEN { expiration } => {
@@ -95,6 +91,8 @@ fn handle_open_lottery(
     bought_tickets: u64,
     expiration: Expiration,
 ) -> Result<Response, ContractError> {
+    // function goal is to check to see if the lottery itself
+    // is expired, if so update state.
     if !(expiration.is_expired(&env.block)) {
         // Take the amount of tokens sent, and verify its the amount needed.
         // Should be an exact amount.
@@ -252,121 +250,4 @@ pub fn query_ticket_count(deps: Deps, _env: Env, addr: Addr) -> StdResult<Ticket
     Ok(TicketResponse {
         tickets: tickets_opt,
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, Addr};
-
-    use crate::msg::ExecuteMsg::BuyTicket;
-    use crate::tests::common::{
-        TestUser, TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST,
-    };
-
-    use super::*;
-
-    #[test]
-    fn proper_initialization() {
-        let instantiate_message = InstantiateMsg {
-            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
-            lottery_duration: TESTING_DURATION,
-        };
-
-        let mut deps = mock_dependencies();
-        let info = mock_info("creator", &coins(1000, "earth"));
-        let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_message).unwrap();
-        assert_eq!(0, res.messages.len());
-    }
-
-    #[test]
-    fn buy_tickets() {
-        let instantiate_message = InstantiateMsg {
-            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
-            lottery_duration: TESTING_DURATION,
-        };
-
-        let mut deps = mock_dependencies();
-
-        let _ = instantiate(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("creator", &coins(1000, "earth")),
-            instantiate_message,
-        )
-        .unwrap();
-
-        let _ = execute(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("creator", &coins(1000, TESTING_NATIVE_DENOM)),
-            BuyTicket { num_tickets: 1 },
-        )
-        .unwrap();
-
-        let res = query_ticket_count(
-            deps.as_ref(),
-            mock_env(),
-            Addr::unchecked("creator".to_string()),
-        );
-
-        assert!(res.is_ok());
-        let ticket_response = res.unwrap();
-        assert_eq!(ticket_response.tickets, Some(1))
-    }
-
-    #[test]
-    fn buy_multiple_tickets() {
-        let mut deps = mock_dependencies();
-
-        let instantiate_message = InstantiateMsg {
-            ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
-            lottery_duration: TESTING_DURATION,
-        };
-
-        let test_users = vec![
-            TestUser {
-                addr: "creator".to_string(),
-                tickets: 1,
-                coin: coin(TESTING_TICKET_COST * 1, TESTING_NATIVE_DENOM),
-            },
-            TestUser {
-                addr: "testUserA".to_string(),
-                tickets: 10,
-                coin: coin(TESTING_TICKET_COST * 10, TESTING_NATIVE_DENOM),
-            },
-            TestUser {
-                addr: "testUserB".to_string(),
-                tickets: 10,
-                coin: coin(TESTING_TICKET_COST * 10, TESTING_NATIVE_DENOM),
-            },
-        ];
-
-        let _ = instantiate(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("creator", &coins(1000, "earth")),
-            instantiate_message,
-        )
-        .unwrap();
-
-        for test_user in test_users {
-            execute(
-                deps.as_mut(),
-                mock_env(),
-                mock_info(&test_user.addr, &[test_user.coin]),
-                BuyTicket {
-                    num_tickets: test_user.tickets,
-                },
-            )
-            .unwrap();
-
-            let res =
-                query_ticket_count(deps.as_ref(), mock_env(), Addr::unchecked(test_user.addr));
-            assert!(res.is_ok());
-
-            let ticket_response = res.unwrap();
-            assert_eq!(ticket_response.tickets, Some(test_user.tickets));
-        }
-    }
 }

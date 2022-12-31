@@ -6,9 +6,7 @@ mod tests {
     use cw_utils::Duration;
 
     use crate::msg::{ExecuteMsg, InstantiateMsg};
-    use crate::tests::common::{
-        TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN,
-    };
+    use crate::tests::common::{TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN, TEST_USER_1, TEST_USER_2, TEST_USER_3};
     use crate::ContractError;
 
     fn expire(voting_period: Duration) -> impl Fn(&mut BlockInfo) {
@@ -39,7 +37,7 @@ mod tests {
     #[test]
     fn instantiate_buy_tickets_and_execute() {
         let mut app = mock_app(
-            Addr::unchecked(TEST_ADMIN.clone()),
+            Addr::unchecked(TEST_ADMIN),
             vec![Coin {
                 denom: TESTING_NATIVE_DENOM.to_string(),
                 amount: Uint128::new(100_000_000_000u128),
@@ -47,14 +45,15 @@ mod tests {
         );
 
         app.send_tokens(
-            Addr::unchecked(TEST_ADMIN.clone()),
-            Addr::unchecked("TEST_USER_1"),
+            Addr::unchecked(TEST_ADMIN),
+            Addr::unchecked(TEST_USER_1),
             &[Coin {
                 denom: TESTING_NATIVE_DENOM.to_string(),
                 amount: Uint128::new(100_000u128),
             }],
         )
         .unwrap();
+
         let lotto_code_id = app.store_code(contract_lotto());
 
         let instantiate_message = InstantiateMsg {
@@ -77,7 +76,7 @@ mod tests {
 
         let app_response_1 = app
             .execute_contract(
-                Addr::unchecked("TEST_USER_1"),
+                Addr::unchecked(TEST_USER_1),
                 lotto_contract_addr.clone(),
                 &buy_ticket_exec_msg,
                 &[Coin {
@@ -94,7 +93,7 @@ mod tests {
         // the next call would fail.
         let app_response_2 = app
             .execute_contract(
-                Addr::unchecked("TEST_USER_2"),
+                Addr::unchecked(TEST_USER_2),
                 lotto_contract_addr.clone(),
                 &buy_ticket_exec_msg,
                 &[],
@@ -103,7 +102,7 @@ mod tests {
 
         let app_resp_err = app
             .execute_contract(
-                Addr::unchecked("TEST_USER_3"),
+                Addr::unchecked(TEST_USER_3),
                 lotto_contract_addr.clone(),
                 &buy_ticket_exec_msg,
                 &[],

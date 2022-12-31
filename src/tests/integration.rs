@@ -3,12 +3,13 @@ use cosmwasm_std::{coin, Addr, BlockInfo, Coin, Empty, Uint128};
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 use cw_utils::Duration;
 
-use crate::msg::{ExecuteMsg, InstantiateMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg};
 use crate::tests::common::{
     TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN, TEST_USER_1,
     TEST_USER_2, TEST_USER_3,
 };
 use crate::ContractError;
+use crate::state::LotteryState;
 
 fn expire(voting_period: Duration) -> impl Fn(&mut BlockInfo) {
     move |block: &mut BlockInfo| {
@@ -123,4 +124,14 @@ fn instantiate_buy_tickets_and_execute() {
             &[],
         )
         .unwrap();
+
+    let query_resp: LotteryStateResponse = app
+        .wrap()
+        .query_wasm_smart(lotto_contract_addr, &QueryMsg::LotteryState {}).unwrap();
+
+    let expected_state = LotteryStateResponse {
+        lotto_state: LotteryState::CLOSED { winner: (Addr::unchecked(TEST_USER_1)), claimed: false }
+    };
+
+    assert_eq!(expected_state, query_resp)
 }

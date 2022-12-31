@@ -1,6 +1,6 @@
+use crate::contract::{execute, instantiate, query_ticket_count};
 use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
 use cosmwasm_std::{coin, coins, Addr};
-use crate::contract::{execute, instantiate, query_ticket_count};
 
 use crate::msg::ExecuteMsg::BuyTicket;
 use crate::msg::InstantiateMsg;

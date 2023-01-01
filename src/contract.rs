@@ -162,6 +162,14 @@ fn execute_claim(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response
             if !claimed {
                 if info.sender == winner {
                     // send contract funds, and update lottery state to "closed and claimed"
+                    LOTTERY_STATE.save(
+                        deps.storage,
+                        &LotteryState::CLOSED {
+                            winner,
+                            claimed: true,
+                        },
+                    )?;
+
                     Ok(Response::new())
                 } else {
                     Err(ContractError::LotteryNotClaimedByCorrectUser {})

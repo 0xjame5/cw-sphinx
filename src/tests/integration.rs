@@ -1,15 +1,16 @@
+use cosmwasm_std::OverflowOperation::Add;
 use cosmwasm_std::{coin, Addr, BlockInfo, Coin, Empty, Uint128};
 
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 use cw_utils::Duration;
 
 use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg};
+use crate::state::LotteryState;
 use crate::tests::common::{
     TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN, TEST_USER_1,
     TEST_USER_2, TEST_USER_3,
 };
 use crate::ContractError;
-use crate::state::LotteryState;
 
 fn expire(voting_period: Duration) -> impl Fn(&mut BlockInfo) {
     move |block: &mut BlockInfo| {
@@ -114,8 +115,6 @@ fn instantiate_buy_tickets_and_execute() {
         app_resp_err.downcast().unwrap()
     );
 
-    // execute the app endpoint to execute the lottery, let's see how this goes
-
     let exec_claim_resp = app
         .execute_contract(
             Addr::unchecked(TEST_ADMIN),
@@ -127,11 +126,40 @@ fn instantiate_buy_tickets_and_execute() {
 
     let query_resp: LotteryStateResponse = app
         .wrap()
-        .query_wasm_smart(lotto_contract_addr, &QueryMsg::LotteryState {}).unwrap();
+        .query_wasm_smart(lotto_contract_addr.clone(), &QueryMsg::LotteryState {})
+        .unwrap();
 
-    let expected_state = LotteryStateResponse {
-        lotto_state: LotteryState::CLOSED { winner: (Addr::unchecked(TEST_USER_1)), claimed: false }
-    };
+    assert_eq!(
+        query_resp,
+        LotteryStateResponse {
+            lotto_state: LotteryState::CLOSED {
+                winner: (Addr::unchecked(TEST_USER_1)),
+                claimed: false
+            }
+        }
+    );
 
-    assert_eq!(expected_state, query_resp)
+    let zeta = app
+        .execute_contract(
+            Addr::unchecked(TEST_USER_1),
+            lotto_contract_addr.clone(),
+            &ExecuteMsg::ClaimTokens {},
+            &[],
+        )
+        .unwrap();
+
+    let query_resp_post_claim: LotteryStateResponse = app
+        .wrap()
+        .query_wasm_smart(lotto_contract_addr.clone(), &QueryMsg::LotteryState {})
+        .unwrap();
+
+    assert_eq!(
+        query_resp_post_claim,
+        LotteryStateResponse {
+            lotto_state: LotteryState::CLOSED {
+                winner: (Addr::unchecked(TEST_USER_1)),
+                claimed: true
+            }
+        }
+    );
 }

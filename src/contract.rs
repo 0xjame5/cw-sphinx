@@ -2,9 +2,8 @@ use std::ops::{Div, Mul, Range};
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{
-    to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
-};
+use cosmwasm_std::{to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, SubMsg, BankMsg};
+use cosmwasm_std::CosmosMsg::Bank;
 use cw2::set_contract_version;
 use cw_utils::{must_pay, Expiration};
 use rand::{Rng, SeedableRng};
@@ -160,7 +159,7 @@ fn execute_claim(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response
     match lottery_state {
         LotteryState::CLOSED { winner, claimed } => {
             if !claimed {
-                if info.sender == winner {
+                if info.sender.clone() == winner {
                     // send contract funds, and update lottery state to "closed and claimed"
                     LOTTERY_STATE.save(
                         deps.storage,
@@ -170,7 +169,17 @@ fn execute_claim(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response
                         },
                     )?;
 
-                    Ok(Response::new())
+
+                    let disperse_reward_msg = SubMsg::new(BankMsg::Send {
+                        to_address: String::from(info.sender.clone()),
+                        amount: vec![],
+                    });
+
+                    let mut response: Response = Default::default();
+
+                    response.messages = vec![disperse_reward_msg];
+
+                    Ok(response)
                 } else {
                     Err(ContractError::LotteryNotClaimedByCorrectUser {})
                 }

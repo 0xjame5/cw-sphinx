@@ -74,7 +74,7 @@ fn instantiate_buy_tickets_and_execute() {
         )
         .unwrap();
 
-    let app_response_1 = app
+    let _buy_ticket_response_1 = app
         .execute_contract(
             Addr::unchecked(TEST_USER_1),
             lotto_contract_addr.clone(),
@@ -102,7 +102,7 @@ fn instantiate_buy_tickets_and_execute() {
     // Note that this would be empty, shit would return OK.
     // This is because this would update the contract to next state. However,
     // the next call would fail.
-    let app_response_2 = app
+    let _buy_ticket_response_2 = app
         .execute_contract(
             Addr::unchecked(TEST_USER_2),
             lotto_contract_addr.clone(),
@@ -124,7 +124,7 @@ fn instantiate_buy_tickets_and_execute() {
         app_resp_err.downcast().unwrap()
     );
 
-    let exec_claim_resp = app
+    let _claim_resp = app
         .execute_contract(
             Addr::unchecked(TEST_ADMIN),
             lotto_contract_addr.clone(),
@@ -148,7 +148,7 @@ fn instantiate_buy_tickets_and_execute() {
         }
     );
 
-    let zeta = app
+    let _claim_response = app
         .execute_contract(
             Addr::unchecked(TEST_USER_1),
             lotto_contract_addr.clone(),

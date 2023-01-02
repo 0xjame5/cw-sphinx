@@ -1,6 +1,4 @@
-use cosmwasm_std::{
-    coin, Addr, BlockInfo, Coin, Empty, Uint128,
-};
+use cosmwasm_std::{coin, Addr, BlockInfo, Coin, Empty, Uint128};
 
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 use cw_utils::Duration;

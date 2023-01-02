@@ -1,7 +1,5 @@
-use cosmwasm_std::CosmosMsg::Bank;
-use cosmwasm_std::OverflowOperation::Add;
 use cosmwasm_std::{
-    coin, Addr, BalanceResponse, BankMsg, BankQuery, BlockInfo, Coin, Empty, Uint128,
+    coin, Addr, BlockInfo, Coin, Empty, Uint128,
 };
 
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};

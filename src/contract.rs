@@ -2,8 +2,10 @@ use std::ops::{Div, Mul, Range};
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128, SubMsg, BankMsg};
-use cosmwasm_std::CosmosMsg::Bank;
+use cosmwasm_std::{
+    to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg,
+    Uint128,
+};
 use cw2::set_contract_version;
 use cw_utils::{must_pay, Expiration};
 use rand::{Rng, SeedableRng};
@@ -153,42 +155,58 @@ fn execute_lottery(
     }
 }
 
-fn execute_claim(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+fn execute_claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
 
     match lottery_state {
         LotteryState::CLOSED { winner, claimed } => {
-            if !claimed {
-                if info.sender.clone() == winner {
-                    // send contract funds, and update lottery state to "closed and claimed"
-                    LOTTERY_STATE.save(
-                        deps.storage,
-                        &LotteryState::CLOSED {
-                            winner,
-                            claimed: true,
-                        },
-                    )?;
-
-
-                    let disperse_reward_msg = SubMsg::new(BankMsg::Send {
-                        to_address: String::from(info.sender.clone()),
-                        amount: vec![],
-                    });
-
-                    let mut response: Response = Default::default();
-
-                    response.messages = vec![disperse_reward_msg];
-
-                    Ok(response)
-                } else {
-                    Err(ContractError::LotteryNotClaimedByCorrectUser {})
-                }
-            } else {
-                Err(ContractError::LotteryAlreadyClaimed {})
-            }
+            handle_lottery_claim(deps, &env, info, winner, claimed)
         }
         LotteryState::CHOOSING => Err(ContractError::LotteryNotClaimable {}),
         LotteryState::OPEN { .. } => Err(ContractError::LotteryNotClaimable {}),
+    }
+}
+
+fn handle_lottery_claim(
+    deps: DepsMut,
+    env: &Env,
+    info: MessageInfo,
+    winner: Addr,
+    claimed: bool,
+) -> Result<Response, ContractError> {
+    if !claimed {
+        if info.sender.clone() == winner {
+            // send contract funds, and update lottery state to "closed and claimed"
+            LOTTERY_STATE.save(
+                deps.storage,
+                &LotteryState::CLOSED {
+                    winner,
+                    claimed: true,
+                },
+            )?;
+
+            let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
+
+            let lottery_pool = deps
+                .querier
+                .query_balance(&env.contract.address, ticket_cost.denom)?;
+
+
+            let disperse_reward_msg = SubMsg::new(BankMsg::Send {
+                to_address: String::from(info.sender.clone()),
+                amount: vec![lottery_pool],
+            });
+
+            let mut response: Response = Default::default();
+
+            response.messages = vec![disperse_reward_msg];
+
+            Ok(response)
+        } else {
+            Err(ContractError::LotteryNotClaimedByCorrectUser {})
+        }
+    } else {
+        Err(ContractError::LotteryAlreadyClaimed {})
     }
 }
 

@@ -1,4 +1,3 @@
-use cosmwasm_std::OverflowOperation::Add;
 use cosmwasm_std::{coin, Addr, BlockInfo, Coin, Empty, Uint128};
 
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
@@ -162,4 +161,12 @@ fn instantiate_buy_tickets_and_execute() {
             }
         }
     );
+
+    let contract_balance = app.wrap().query_balance(lotto_contract_addr, TESTING_NATIVE_DENOM)
+        .unwrap();
+
+    assert_eq!(contract_balance, Coin {
+        denom: TESTING_NATIVE_DENOM.to_string(),
+        amount: Default::default(),
+    });
 }

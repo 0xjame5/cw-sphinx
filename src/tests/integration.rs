@@ -1,4 +1,8 @@
-use cosmwasm_std::{coin, Addr, BlockInfo, Coin, Empty, Uint128};
+use cosmwasm_std::CosmosMsg::Bank;
+use cosmwasm_std::OverflowOperation::Add;
+use cosmwasm_std::{
+    coin, Addr, BalanceResponse, BankMsg, BankQuery, BlockInfo, Coin, Empty, Uint128,
+};
 
 use cw_multi_test::{App, Contract, ContractWrapper, Executor};
 use cw_utils::Duration;
@@ -86,6 +90,17 @@ fn instantiate_buy_tickets_and_execute() {
         )
         .unwrap();
 
+    // User should have 99k
+    assert_eq!(
+        app.wrap()
+            .query_balance(Addr::unchecked(TEST_USER_1), TESTING_NATIVE_DENOM)
+            .unwrap(),
+        Coin {
+            denom: TESTING_NATIVE_DENOM.to_string(),
+            amount: Uint128::new(99_000u128)
+        }
+    );
+
     app.update_block(expire(TESTING_DURATION));
 
     // Note that this would be empty, shit would return OK.
@@ -108,7 +123,6 @@ fn instantiate_buy_tickets_and_execute() {
             &[],
         )
         .unwrap_err();
-
     assert_eq!(
         ContractError::TicketBuyingNotAvailable {},
         app_resp_err.downcast().unwrap()
@@ -162,11 +176,27 @@ fn instantiate_buy_tickets_and_execute() {
         }
     );
 
-    let contract_balance = app.wrap().query_balance(lotto_contract_addr, TESTING_NATIVE_DENOM)
+    let contract_balance = app
+        .wrap()
+        .query_balance(lotto_contract_addr, TESTING_NATIVE_DENOM)
         .unwrap();
 
-    assert_eq!(contract_balance, Coin {
-        denom: TESTING_NATIVE_DENOM.to_string(),
-        amount: Default::default(),
-    });
+    assert_eq!(
+        contract_balance,
+        Coin {
+            denom: TESTING_NATIVE_DENOM.to_string(),
+            amount: Default::default(),
+        }
+    );
+
+    // User should have original amount, 100k
+    assert_eq!(
+        app.wrap()
+            .query_balance(Addr::unchecked(TEST_USER_1), TESTING_NATIVE_DENOM)
+            .unwrap(),
+        Coin {
+            denom: TESTING_NATIVE_DENOM.to_string(),
+            amount: Uint128::new(100_000u128)
+        }
+    );
 }

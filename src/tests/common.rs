@@ -12,7 +12,7 @@ pub struct TestUser {
     pub coin: Coin,
 }
 
-pub const TEST_ADMIN: &str = "ADMIN";
-pub const TEST_USER_1: &str = "USER1";
-pub const TEST_USER_2: &str = "USER2";
-pub const TEST_USER_3: &str = "USER3";
+pub const TEST_ADMIN: &str = "admin";
+pub const TEST_USER_1: &str = "user1";
+pub const TEST_USER_2: &str = "user2";
+pub const TEST_USER_3: &str = "user3";

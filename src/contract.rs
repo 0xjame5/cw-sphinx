@@ -191,7 +191,6 @@ fn handle_lottery_claim(
                 .querier
                 .query_balance(&env.contract.address, ticket_cost.denom)?;
 
-
             let disperse_reward_msg = SubMsg::new(BankMsg::Send {
                 to_address: String::from(info.sender.clone()),
                 amount: vec![lottery_pool],

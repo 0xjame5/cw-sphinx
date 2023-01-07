@@ -56,4 +56,4 @@ rand_pcg = "0.3.1"
 getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
-cw-multi-test = "0.16"
+cw-multi-test = "0.16.2"

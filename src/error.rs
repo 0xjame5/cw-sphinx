@@ -1,16 +1,21 @@
-use cosmwasm_std::StdError;
 use thiserror::Error;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub enum ContractError {
     #[error("{0}")]
-    Std(#[from] StdError),
+    Std(cosmwasm_std::StdError),
+
+    #[error("{0}")]
+    OverFlowError(cosmwasm_std::OverflowError),
+
+    #[error("{0}")]
+    PaymentError(cw_utils::PaymentError),
 
     #[error("Unauthorized")]
     Unauthorized {},
 
     #[error("Not enough funds passed for the number of tickets being bought.")]
-    TicketBuyingNotEnoughFunds {},
+    TicketBuyingIncorrectAmount {},
 
     #[error("The ticket buying process right now is closed.")]
     TicketBuyingNotAvailable {},
@@ -29,7 +34,22 @@ pub enum ContractError {
 
     #[error("Custom Error val: {val:?}")]
     CustomError { val: String },
+}
 
-    #[error("Payment Error")]
-    PaymentError {},
+impl From<cw_utils::PaymentError> for ContractError {
+    fn from(err: cw_utils::PaymentError) -> Self {
+        ContractError::PaymentError(err)
+    }
+}
+
+impl From<cosmwasm_std::StdError> for ContractError {
+    fn from(err: cosmwasm_std::StdError) -> Self {
+        ContractError::Std(err)
+    }
+}
+
+impl From<cosmwasm_std::OverflowError> for ContractError {
+    fn from(err: cosmwasm_std::OverflowError) -> Self {
+        ContractError::OverFlowError(err)
+    }
 }

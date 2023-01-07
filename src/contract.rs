@@ -2,8 +2,12 @@ use std::ops::{Div, Mul, Range};
 
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg,
+    Uint128,
+};
 use cw2::set_contract_version;
+use cw_utils::{must_pay, Expiration};
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
 
@@ -27,10 +31,8 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // make sure ticket cost is greater than 0, or that it's a native
-    // token. or apart of some predefined white list.
-    let cost_per_ticket = msg.ticket_cost;
-    TICKET_UNIT_COST.save(deps.storage, &cost_per_ticket)?;
+    // TODO (James): make sure ticket cost is greater than 0 or throw err
+    TICKET_UNIT_COST.save(deps.storage, &msg.ticket_cost)?;
 
     LOTTERY_STATE.save(
         deps.storage,
@@ -73,51 +75,47 @@ fn execute_buy_ticket(
     info: MessageInfo,
     bought_tickets: u64,
 ) -> Result<Response, ContractError> {
-    // 1. if a user is trying to buy a ticket, before doing so.
-    // 2. check to see if the lottery itself is expired, if so update state.
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
-
     match lottery_state {
         LotteryState::OPEN { expiration } => {
-            if !(expiration.is_expired(&_env.block)) {
-                // Take the amount of tokens sent, and verify its the amount needed.
-                // Should be an exact amount.
-                // let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
-                // let bought_tickets_convert = u128::from(bought_tickets);
-                // let bought_tickets_U128 = Uint128::new(bought_tickets_convert);
-
-                // let cost = ticket_cost.amount.checked_mul(bought_tickets_U128);
-
-                // let ex_cost = match cost {
-                //     Ok(val) => Ok(val),
-                //     Err(_) => Err(ContractError::PaymentError {}),
-                // }?;
-
-                // returns amount of denom wanted.
-                // let amount_received_future = must_pay(&info, &ticket_cost.denom);
-                //
-                // let amount_rematch = match amount_received_future {
-                //     Ok(val) => Ok(val),
-                //     Err(_) => Err(ContractError::TicketBuyingNotEnoughFunds {}),
-                // };
-
-                // let amount_received_fut = amount_rematch?;
-
-                // if ex_cost != amount_received_fut {
-                //     Err(ContractError::TicketBuyingNotEnoughFunds {})
-                // } else {
-                update_player(deps, &info, bought_tickets)?;
-                Ok(Response::new())
-                // }
-            } else {
-                // Lottery is expired, therefore go ahead and update the state of the contract
-                // to next phase.
-                LOTTERY_STATE.save(deps.storage, &LotteryState::CHOOSING {})?;
-                Ok(Response::new())
-            }
+            handle_open_lottery(deps, &_env, &info, bought_tickets, expiration)
         }
         LotteryState::CHOOSING => Err(ContractError::TicketBuyingNotAvailable {}),
         LotteryState::CLOSED { .. } => Err(ContractError::TicketBuyingNotAvailable {}),
+    }
+}
+
+fn handle_open_lottery(
+    deps: DepsMut,
+    env: &Env,
+    info: &MessageInfo,
+    bought_tickets: u64,
+    expiration: Expiration,
+) -> Result<Response, ContractError> {
+    // function goal is to check to see if the lottery itself
+    // is expired, if so update state.
+    if !(expiration.is_expired(&env.block)) {
+        // Take the amount of tokens sent, and verify its the amount needed.
+        // Should be an exact amount.
+        let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
+
+        let total_cost = ticket_cost
+            .amount
+            .checked_mul(Uint128::new(u128::from(bought_tickets)))?;
+
+        let amount_received_future = must_pay(info, &ticket_cost.denom)?;
+
+        if amount_received_future == total_cost {
+            update_player(deps, info, bought_tickets)?;
+            Ok(Response::new())
+        } else {
+            Err(ContractError::TicketBuyingIncorrectAmount {})
+        }
+    } else {
+        // Lottery is expired, therefore go ahead and update the state of the contract
+        // to next phase.
+        LOTTERY_STATE.save(deps.storage, &LotteryState::CHOOSING {})?;
+        Ok(Response::new())
     }
 }
 
@@ -157,24 +155,57 @@ fn execute_lottery(
     }
 }
 
-fn execute_claim(deps: DepsMut, _env: Env, info: MessageInfo) -> Result<Response, ContractError> {
+fn execute_claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
 
     match lottery_state {
         LotteryState::CLOSED { winner, claimed } => {
-            if !claimed {
-                if info.sender == winner {
-                    // send contract funds, and update lottery state to "closed and claimed"
-                    Ok(Response::new())
-                } else {
-                    Err(ContractError::LotteryNotClaimedByCorrectUser {})
-                }
-            } else {
-                Err(ContractError::LotteryAlreadyClaimed {})
-            }
+            handle_lottery_claim(deps, &env, info, winner, claimed)
         }
         LotteryState::CHOOSING => Err(ContractError::LotteryNotClaimable {}),
         LotteryState::OPEN { .. } => Err(ContractError::LotteryNotClaimable {}),
+    }
+}
+
+fn handle_lottery_claim(
+    deps: DepsMut,
+    env: &Env,
+    info: MessageInfo,
+    winner: Addr,
+    claimed: bool,
+) -> Result<Response, ContractError> {
+    if !claimed {
+        if info.sender == winner {
+            // send contract funds, and update lottery state to "closed and claimed"
+            LOTTERY_STATE.save(
+                deps.storage,
+                &LotteryState::CLOSED {
+                    winner,
+                    claimed: true,
+                },
+            )?;
+
+            let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
+
+            let lottery_pool = deps
+                .querier
+                .query_balance(&env.contract.address, ticket_cost.denom)?;
+
+            let disperse_reward_msg = SubMsg::new(BankMsg::Send {
+                to_address: String::from(info.sender),
+                amount: vec![lottery_pool],
+            });
+
+            let mut response: Response = Default::default();
+
+            response.messages = vec![disperse_reward_msg];
+
+            Ok(response)
+        } else {
+            Err(ContractError::LotteryNotClaimedByCorrectUser {})
+        }
+    } else {
+        Err(ContractError::LotteryAlreadyClaimed {})
     }
 }
 
@@ -249,9 +280,7 @@ pub fn query_lottery_state(deps: Deps, _env: Env) -> StdResult<LotteryStateRespo
 
 pub fn query_ticket_count(deps: Deps, _env: Env, addr: Addr) -> StdResult<TicketResponse> {
     let res = PLAYERS.may_load(deps.storage, &addr)?;
-
     let tickets_opt: Option<u64> = res.map(|player_info| player_info.tickets);
-
     Ok(TicketResponse {
         tickets: tickets_opt,
     })
@@ -259,15 +288,14 @@ pub fn query_ticket_count(deps: Deps, _env: Env, addr: Addr) -> StdResult<Ticket
 
 #[cfg(test)]
 mod tests {
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, Addr};
-
-    use crate::msg::ExecuteMsg::BuyTicket;
-    use crate::tests::common::{
+    use crate::contract::{execute, instantiate, query_ticket_count};
+    use crate::msg::ExecuteMsg;
+    use crate::msg::InstantiateMsg;
+    use crate::test_util::tests::{
         TestUser, TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST,
     };
-
-    use super::*;
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{coin, coins, Addr};
 
     #[test]
     fn proper_initialization() {
@@ -302,8 +330,8 @@ mod tests {
         let _ = execute(
             deps.as_mut(),
             mock_env(),
-            mock_info("creator", &coins(1000, "earth")),
-            BuyTicket { num_tickets: 1 },
+            mock_info("creator", &coins(1000, TESTING_NATIVE_DENOM)),
+            ExecuteMsg::BuyTicket { num_tickets: 1 },
         )
         .unwrap();
 
@@ -331,14 +359,17 @@ mod tests {
             TestUser {
                 addr: "creator".to_string(),
                 tickets: 1,
+                coin: coin(TESTING_TICKET_COST * 1, TESTING_NATIVE_DENOM),
             },
             TestUser {
                 addr: "testUserA".to_string(),
                 tickets: 10,
+                coin: coin(TESTING_TICKET_COST * 10, TESTING_NATIVE_DENOM),
             },
             TestUser {
                 addr: "testUserB".to_string(),
                 tickets: 10,
+                coin: coin(TESTING_TICKET_COST * 10, TESTING_NATIVE_DENOM),
             },
         ];
 
@@ -354,8 +385,8 @@ mod tests {
             execute(
                 deps.as_mut(),
                 mock_env(),
-                mock_info(&test_user.addr, &coins(1000, "earth")),
-                BuyTicket {
+                mock_info(&test_user.addr, &[test_user.coin]),
+                ExecuteMsg::BuyTicket {
                     num_tickets: test_user.tickets,
                 },
             )

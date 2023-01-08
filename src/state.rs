@@ -4,6 +4,10 @@ use cw_utils::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+pub const ADMIN: Item<Addr> = Item::new("admin_addr");
+
+pub const HOUSE_FEE: Item<u64> = Item::new("house_fee");
+
 // Map of players and their ticket allocation
 pub const PLAYERS: Map<&Addr, PlayerInfo> = Map::new("players");
 

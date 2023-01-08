@@ -3,47 +3,68 @@ use std::ops::{Div, Mul, Range};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg,
-    Uint128,
+    to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, SubMsg, Uint128,
 };
 use cw2::set_contract_version;
 use cw_utils::{must_pay, Expiration};
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
 
-use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION, TOTAL_POOL_SIZE};
+use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION, MAX_HOUSE_FEE, TOTAL_POOL_SIZE};
 use crate::error::ContractError;
 use crate::helpers::get_player_ranges;
 use crate::models::PlayerRanges;
 use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
-use crate::state::{LotteryState, PlayerInfo, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST};
+use crate::state::{
+    LotteryState, PlayerInfo, ADMIN, HOUSE_FEE, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST,
+};
 
 /*
 Each individual contract owner will be able to creat their own ticket cost. We require it to be
 set to be more defined.
+
+contract fee, of <= 5000 or half the total winnings are capped.
+- so 5% of 10000 is a weight set to 500
 */
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // TODO (James): make sure ticket cost is greater than 0 or throw err
+    // TODO (entrancedjames): Require ticket cost to greater than 0
     TICKET_UNIT_COST.save(deps.storage, &msg.ticket_cost)?;
+
+    let admin_addr = deps.api.addr_validate(&msg.admin.to_string())?;
+    ADMIN.save(deps.storage, &admin_addr)?;
+
+    // if msg.house_fee <=
+    let house_fee = validate_house_fee(msg.house_fee)?;
+    HOUSE_FEE.save(deps.storage, &house_fee)?;
 
     LOTTERY_STATE.save(
         deps.storage,
         &LotteryState::OPEN {
-            expiration: msg.lottery_duration.after(&_env.block),
+            expiration: msg.lottery_duration.after(&env.block),
         },
     )?;
 
     Ok(Response::new()
         .add_attribute("method", "instantiate")
         .add_attribute("owner", info.sender))
+}
+
+fn validate_house_fee(house_fee: u64) -> Result<u64, ContractError> {
+    if house_fee >= MAX_HOUSE_FEE {
+        Err(ContractError::ContractInstantiationInvalidFee {})
+    } else {
+        Ok(house_fee)
+    }
 }
 
 /*
@@ -292,7 +313,7 @@ mod tests {
     use crate::msg::ExecuteMsg;
     use crate::msg::InstantiateMsg;
     use crate::test_util::tests::{
-        TestUser, TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST,
+        TestUser, TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN,
     };
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, coins, Addr};
@@ -302,6 +323,8 @@ mod tests {
         let instantiate_message = InstantiateMsg {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
+            admin: Addr::unchecked(TEST_ADMIN),
+            house_fee: 500,
         };
 
         let mut deps = mock_dependencies();
@@ -315,6 +338,8 @@ mod tests {
         let instantiate_message = InstantiateMsg {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
+            admin: Addr::unchecked(TEST_ADMIN),
+            house_fee: 500,
         };
 
         let mut deps = mock_dependencies();
@@ -353,6 +378,8 @@ mod tests {
         let instantiate_message = InstantiateMsg {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
+            admin: Addr::unchecked(TEST_ADMIN),
+            house_fee: 500,
         };
 
         let test_users = vec![

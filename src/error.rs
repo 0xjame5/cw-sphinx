@@ -14,6 +14,9 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
+    #[error("Invalid fee passed in.")]
+    ContractInstantiationInvalidFee {},
+
     #[error("Not enough funds passed for the number of tickets being bought.")]
     TicketBuyingIncorrectAmount {},
 

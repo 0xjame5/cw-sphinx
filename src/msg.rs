@@ -8,6 +8,8 @@ use cw_utils::Duration;
 pub struct InstantiateMsg {
     pub ticket_cost: Coin,
     pub lottery_duration: Duration,
+    pub admin: Addr,
+    pub house_fee: u64,
 }
 
 #[cw_serde]

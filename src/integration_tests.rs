@@ -64,7 +64,7 @@ mod tests {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
             admin: Addr::unchecked(TEST_ADMIN),
-            house_fee: 5000,
+            house_fee: 500,
         };
 
         let lotto_contract_addr = app

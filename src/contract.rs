@@ -3,8 +3,8 @@ use std::ops::{Div, Mul, Range};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, SubMsg, Uint128,
+    to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg,
+    Uint128,
 };
 use cw2::set_contract_version;
 use cw_utils::{must_pay, Expiration};
@@ -19,6 +19,7 @@ use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, Tic
 use crate::state::{
     LotteryState, PlayerInfo, ADMIN, HOUSE_FEE, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST,
 };
+use crate::ContractError::Unauthorized;
 
 /*
 Each individual contract owner will be able to creat their own ticket cost. We require it to be
@@ -57,6 +58,15 @@ pub fn instantiate(
     Ok(Response::new()
         .add_attribute("method", "instantiate")
         .add_attribute("owner", info.sender))
+}
+
+fn validate_is_admin(sender: Addr, deps: &DepsMut) -> Result<Addr, ContractError> {
+    let admin_addr = ADMIN.load(deps.storage)?;
+    if admin_addr != sender {
+        Err(Unauthorized {})
+    } else {
+        Ok(admin_addr)
+    }
 }
 
 fn validate_house_fee(house_fee: u64) -> Result<u64, ContractError> {
@@ -167,8 +177,16 @@ fn execute_lottery(
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
     match lottery_state {
         LotteryState::CHOOSING => {
+            validate_is_admin(_info.sender, &deps)?;
             // TODO(james):: Check before choosing winner to see if the caller is whitelisted (admin).
-            choose_winner(deps, seed)?;
+            let winner = choose_winner(&deps, seed)?;
+            LOTTERY_STATE.save(
+                deps.storage,
+                &LotteryState::CLOSED {
+                    winner,
+                    claimed: false,
+                },
+            )?;
             Ok(Response::new())
         }
         LotteryState::OPEN { .. } => Err(ContractError::LotteryNotExecutable {}),
@@ -230,14 +248,14 @@ fn handle_lottery_claim(
     }
 }
 
-fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
+fn choose_winner(deps: &DepsMut, seed: u64) -> Result<Addr, ContractError> {
     let mut rng = Pcg32::seed_from_u64(seed);
-    let total_tickets = get_num_tickets(&deps);
+    let total_tickets = get_num_tickets(deps);
     let winner_ticket = rng.gen_range(Range {
         start: 0,
         end: total_tickets,
     });
-    let player_ranges = create_player_ranges(&deps, total_tickets);
+    let player_ranges = create_player_ranges(deps, total_tickets);
 
     let mut addr = None;
     for player_range in player_ranges.ranges {
@@ -245,16 +263,10 @@ fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
             addr = Some(player_range.player_addr)
         }
     }
-
-    let winner = addr.unwrap();
-
-    LOTTERY_STATE.save(
-        deps.storage,
-        &LotteryState::CLOSED {
-            winner,
-            claimed: false,
-        },
-    )
+    match addr {
+        None => Err(ContractError::WinnerNotPossibleToFind {}),
+        Some(winner) => Ok(winner),
+    }
 }
 
 fn create_player_ranges(deps: &DepsMut, total_tickets: u64) -> PlayerRanges {

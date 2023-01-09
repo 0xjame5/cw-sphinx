@@ -3,8 +3,8 @@ use std::ops::{Div, Mul, Range};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg,
-    Uint128,
+    to_binary, Addr, BankMsg, Binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult, SubMsg, Uint128,
 };
 use cw2::set_contract_version;
 use cw_utils::{must_pay, Expiration};
@@ -46,8 +46,8 @@ pub fn instantiate(
 
     // if msg.house_fee <=
     let house_fee = validate_house_fee(msg.house_fee)?;
-    HOUSE_FEE.save(deps.storage, &house_fee)?;
-
+    let house_fee_percentage = Decimal::percent(house_fee);
+    HOUSE_FEE.save(deps.storage, &house_fee_percentage)?;
     LOTTERY_STATE.save(
         deps.storage,
         &LotteryState::OPEN {
@@ -178,7 +178,6 @@ fn execute_lottery(
     match lottery_state {
         LotteryState::CHOOSING => {
             validate_is_admin(_info.sender, &deps)?;
-            // TODO(james):: Check before choosing winner to see if the caller is whitelisted (admin).
             let winner = choose_winner(&deps, seed)?;
             LOTTERY_STATE.save(
                 deps.storage,
@@ -196,7 +195,6 @@ fn execute_lottery(
 
 fn execute_claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
-
     match lottery_state {
         LotteryState::CLOSED { winner, claimed } => {
             handle_lottery_claim(deps, &env, info, winner, claimed)
@@ -224,20 +222,42 @@ fn handle_lottery_claim(
                 },
             )?;
 
+            /*
+            So let's think about this. Here we need to do something like...
+            Suppose we have a 100% of funds to give out right?
+            Maybe a 100 coins.
+            Out of that we need to split into two batches, one for the winner and one for the
+            creator.
+            5% of the pool, so suppose we have some amount to reward.
+            */
             let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
-
             let lottery_pool = deps
                 .querier
-                .query_balance(&env.contract.address, ticket_cost.denom)?;
+                .query_balance(&env.contract.address, ticket_cost.denom.clone())?;
+
+            let house_fee = HOUSE_FEE.load(deps.storage)?;
+            let amount_to_pay_in_fees = lottery_pool.amount * house_fee / Uint128::from(100u128);
+            let amount_to_pay_out_to_winner = lottery_pool.amount - amount_to_pay_in_fees;
 
             let disperse_reward_msg = SubMsg::new(BankMsg::Send {
-                to_address: String::from(info.sender),
-                amount: vec![lottery_pool],
+                to_address: String::from(info.sender.clone()),
+                amount: vec![Coin {
+                    denom: ticket_cost.denom.clone(),
+                    amount: amount_to_pay_out_to_winner,
+                }],
+            });
+
+            let disperse_fee_msg = SubMsg::new(BankMsg::Send {
+                to_address: String::from(info.sender.clone()),
+                amount: vec![Coin {
+                    denom: ticket_cost.denom.clone(),
+                    amount: amount_to_pay_in_fees,
+                }],
             });
 
             let mut response: Response = Default::default();
 
-            response.messages = vec![disperse_reward_msg];
+            response.messages = vec![disperse_reward_msg, disperse_fee_msg];
 
             Ok(response)
         } else {

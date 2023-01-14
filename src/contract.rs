@@ -205,14 +205,6 @@ fn handle_lottery_claim(
                 },
             )?;
 
-            /*
-            So let's think about this. Here we need to do something like...
-            Suppose we have a 100% of funds to give out right?
-            Maybe a 100 coins.
-            Out of that we need to split into two batches, one for the winner and one for the
-            creator.
-            5% of the pool, so suppose we have some amount to reward.
-            */
             let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
             let lottery_pool = deps
                 .querier

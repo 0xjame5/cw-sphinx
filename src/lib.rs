@@ -7,5 +7,6 @@ pub mod models;
 pub mod msg;
 pub mod state;
 pub mod test_util;
+pub mod util;
 
 pub use crate::error::ContractError;

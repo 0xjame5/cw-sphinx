@@ -11,7 +11,7 @@ use cw_utils::{must_pay, Expiration};
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
 
-use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION, MAX_HOUSE_FEE, TOTAL_POOL_SIZE};
+use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION, TOTAL_POOL_SIZE};
 use crate::error::ContractError;
 use crate::helpers::get_player_ranges;
 use crate::models::PlayerRanges;
@@ -19,7 +19,7 @@ use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, Tic
 use crate::state::{
     LotteryState, PlayerInfo, ADMIN, HOUSE_FEE, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST,
 };
-use crate::ContractError::Unauthorized;
+use crate::util::{validate_house_fee, validate_is_admin};
 
 /*
 Each individual contract owner will be able to creat their own ticket cost. We require it to be
@@ -44,7 +44,6 @@ pub fn instantiate(
     let admin_addr = deps.api.addr_validate(&msg.admin.to_string())?;
     ADMIN.save(deps.storage, &admin_addr)?;
 
-    // if msg.house_fee <=
     let house_fee = validate_house_fee(msg.house_fee)?;
     let house_fee_percentage = Decimal::percent(house_fee);
     HOUSE_FEE.save(deps.storage, &house_fee_percentage)?;
@@ -58,23 +57,6 @@ pub fn instantiate(
     Ok(Response::new()
         .add_attribute("method", "instantiate")
         .add_attribute("owner", info.sender))
-}
-
-fn validate_is_admin(sender: Addr, deps: &DepsMut) -> Result<Addr, ContractError> {
-    let admin_addr = ADMIN.load(deps.storage)?;
-    if admin_addr != sender {
-        Err(Unauthorized {})
-    } else {
-        Ok(admin_addr)
-    }
-}
-
-fn validate_house_fee(house_fee: u64) -> Result<u64, ContractError> {
-    if house_fee >= MAX_HOUSE_FEE {
-        Err(ContractError::ContractInstantiationInvalidFee {})
-    } else {
-        Ok(house_fee)
-    }
 }
 
 /*

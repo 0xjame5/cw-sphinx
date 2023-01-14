@@ -154,13 +154,13 @@ fn update_player(deps: DepsMut, info: &MessageInfo, bought_tickets: u64) -> StdR
 fn execute_lottery(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     seed: u64,
 ) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
     match lottery_state {
         LotteryState::CHOOSING => {
-            is_admin(_info.sender, &deps)?;
+            is_admin(info.sender, &deps)?;
             let winner = choose_winner(&deps, seed)?;
             LOTTERY_STATE.save(
                 deps.storage,

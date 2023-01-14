@@ -8,8 +8,8 @@ mod tests {
     use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg};
     use crate::state::LotteryState;
     use crate::test_util::tests::{
-        TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN, TEST_USER_1,
-        TEST_USER_2, TEST_USER_3,
+        TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN, TEST_GOD,
+        TEST_USER_1, TEST_USER_2, TEST_USER_3,
     };
     use crate::ContractError;
 
@@ -41,19 +41,29 @@ mod tests {
     #[test]
     fn instantiate_buy_tickets_and_execute() {
         let mut app = mock_app(
-            Addr::unchecked(TEST_ADMIN),
+            Addr::unchecked(TEST_GOD),
             vec![Coin {
                 denom: TESTING_NATIVE_DENOM.to_string(),
                 amount: Uint128::new(100_000_000_000u128),
             }],
         );
 
+        // God is sending token to two people, admin and user1
         app.send_tokens(
+            Addr::unchecked(TEST_GOD),
             Addr::unchecked(TEST_ADMIN),
+            &[Coin {
+                denom: TESTING_NATIVE_DENOM.to_string(),
+                amount: Uint128::new(10_000u128),
+            }],
+        )
+        .unwrap();
+        app.send_tokens(
+            Addr::unchecked(TEST_GOD),
             Addr::unchecked(TEST_USER_1),
             &[Coin {
                 denom: TESTING_NATIVE_DENOM.to_string(),
-                amount: Uint128::new(100_000u128),
+                amount: Uint128::new(3_000u128),
             }],
         )
         .unwrap();
@@ -64,7 +74,7 @@ mod tests {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
             admin: Addr::unchecked(TEST_ADMIN),
-            house_fee: 500,
+            house_fee: 500, // 5%
         };
 
         let lotto_contract_addr = app
@@ -90,14 +100,13 @@ mod tests {
             )
             .unwrap();
 
-        // User should have 99k
         assert_eq!(
             app.wrap()
                 .query_balance(Addr::unchecked(TEST_USER_1), TESTING_NATIVE_DENOM)
                 .unwrap(),
             Coin {
                 denom: TESTING_NATIVE_DENOM.to_string(),
-                amount: Uint128::new(99_000u128)
+                amount: Uint128::new(2_000u128)
             }
         );
 
@@ -115,6 +124,7 @@ mod tests {
             )
             .unwrap();
 
+        // Below validate user cannot buy tickets once the state has changed
         let app_resp_err = app
             .execute_contract(
                 Addr::unchecked(TEST_USER_3),
@@ -189,14 +199,25 @@ mod tests {
             }
         );
 
-        // User should have original amount, 100k
+        // User should have owned minus fees
         assert_eq!(
             app.wrap()
                 .query_balance(Addr::unchecked(TEST_USER_1), TESTING_NATIVE_DENOM)
                 .unwrap(),
             Coin {
                 denom: TESTING_NATIVE_DENOM.to_string(),
-                amount: Uint128::new(100_000u128)
+                amount: Uint128::new(2_950u128)
+            }
+        );
+
+        // Admin should have some more tokens now
+        assert_eq!(
+            app.wrap()
+                .query_balance(Addr::unchecked(TEST_ADMIN), TESTING_NATIVE_DENOM)
+                .unwrap(),
+            Coin {
+                denom: TESTING_NATIVE_DENOM.to_string(),
+                amount: Uint128::new(10_050u128)
             }
         );
     }

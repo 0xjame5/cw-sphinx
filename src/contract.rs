@@ -205,6 +205,8 @@ fn handle_lottery_claim(
                 },
             )?;
 
+            let admin = ADMIN.load(deps.storage)?;
+
             let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
             let lottery_pool = deps
                 .querier
@@ -215,7 +217,7 @@ fn handle_lottery_claim(
             let amount_to_pay_out_to_winner = lottery_pool.amount - amount_to_pay_in_fees;
 
             let disperse_reward_msg = SubMsg::new(BankMsg::Send {
-                to_address: String::from(info.sender.clone()),
+                to_address: String::from(info.sender),
                 amount: vec![Coin {
                     denom: ticket_cost.denom.clone(),
                     amount: amount_to_pay_out_to_winner,
@@ -223,7 +225,7 @@ fn handle_lottery_claim(
             });
 
             let disperse_fee_msg = SubMsg::new(BankMsg::Send {
-                to_address: String::from(info.sender),
+                to_address: String::from(admin),
                 amount: vec![Coin {
                     denom: ticket_cost.denom,
                     amount: amount_to_pay_in_fees,

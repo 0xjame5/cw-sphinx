@@ -22,11 +22,12 @@ use crate::state::{
 use crate::util::{validate_house_fee, validate_is_admin};
 
 /*
-Each individual contract owner will be able to creat their own ticket cost. We require it to be
-set to be more defined.
+Each individual contract owner will be able to creat their own lottery.
 
-contract fee, of <= 5000 or half the total winnings are capped.
-- so 5% of 10000 is a weight set to 500
+The lottery will consist of:
+- the ticket cost per ticekt
+- the winners fee
+- who the admin is
 */
 
 #[cfg_attr(not(feature = "library"), entry_point)]

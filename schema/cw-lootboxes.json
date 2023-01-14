@@ -7,10 +7,20 @@
     "title": "InstantiateMsg",
     "type": "object",
     "required": [
+      "admin",
+      "house_fee",
       "lottery_duration",
       "ticket_cost"
     ],
     "properties": {
+      "admin": {
+        "type": "string"
+      },
+      "house_fee": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0.0
+      },
       "lottery_duration": {
         "$ref": "#/definitions/Duration"
       },

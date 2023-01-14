@@ -19,7 +19,7 @@ use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, Tic
 use crate::state::{
     LotteryState, PlayerInfo, ADMIN, HOUSE_FEE, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST,
 };
-use crate::util::{validate_house_fee, validate_is_admin};
+use crate::util::{is_admin, validate_house_fee};
 
 /*
 Each individual contract owner will be able to creat their own lottery.
@@ -160,7 +160,7 @@ fn execute_lottery(
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
     match lottery_state {
         LotteryState::CHOOSING => {
-            validate_is_admin(_info.sender, &deps)?;
+            is_admin(_info.sender, &deps)?;
             let winner = choose_winner(&deps, seed)?;
             LOTTERY_STATE.save(
                 deps.storage,

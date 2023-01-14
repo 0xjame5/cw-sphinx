@@ -5,7 +5,7 @@ use crate::state::ADMIN;
 use crate::ContractError;
 use crate::ContractError::Unauthorized;
 
-pub fn validate_is_admin(sender: Addr, deps: &DepsMut) -> Result<Addr, ContractError> {
+pub fn is_admin(sender: Addr, deps: &DepsMut) -> Result<Addr, ContractError> {
     let admin_addr = ADMIN.load(deps.storage)?;
     if admin_addr != sender {
         Err(Unauthorized {})

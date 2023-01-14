@@ -42,7 +42,7 @@ pub fn instantiate(
     // TODO (entrancedjames): Require ticket cost to greater than 0
     TICKET_UNIT_COST.save(deps.storage, &msg.ticket_cost)?;
 
-    let admin_addr = deps.api.addr_validate(&msg.admin.to_string())?;
+    let admin_addr = deps.api.addr_validate(&msg.admin)?;
     ADMIN.save(deps.storage, &admin_addr)?;
 
     let house_fee = validate_house_fee(msg.house_fee)?;
@@ -332,7 +332,7 @@ mod tests {
         let instantiate_message = InstantiateMsg {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
-            admin: Addr::unchecked(TEST_ADMIN),
+            admin: TEST_ADMIN.to_string(),
             house_fee: 500,
         };
 
@@ -347,7 +347,7 @@ mod tests {
         let instantiate_message = InstantiateMsg {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
-            admin: Addr::unchecked(TEST_ADMIN),
+            admin: TEST_ADMIN.to_string(),
             house_fee: 500,
         };
 
@@ -387,7 +387,7 @@ mod tests {
         let instantiate_message = InstantiateMsg {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
-            admin: Addr::unchecked(TEST_ADMIN),
+            admin: TEST_ADMIN.to_string(),
             house_fee: 500,
         };
 

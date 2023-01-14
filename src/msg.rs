@@ -8,7 +8,7 @@ use cw_utils::Duration;
 pub struct InstantiateMsg {
     pub ticket_cost: Coin,
     pub lottery_duration: Duration,
-    pub admin: Addr,
+    pub admin: String,
     pub house_fee: u64,
 }
 

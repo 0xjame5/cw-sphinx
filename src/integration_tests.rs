@@ -73,7 +73,7 @@ mod tests {
         let instantiate_message = InstantiateMsg {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
-            admin: Addr::unchecked(TEST_ADMIN),
+            admin: TEST_ADMIN.to_string(),
             house_fee: 500, // 5%
         };
 

@@ -248,9 +248,9 @@ fn handle_lottery_claim(
             });
 
             let disperse_fee_msg = SubMsg::new(BankMsg::Send {
-                to_address: String::from(info.sender.clone()),
+                to_address: String::from(info.sender),
                 amount: vec![Coin {
-                    denom: ticket_cost.denom.clone(),
+                    denom: ticket_cost.denom,
                     amount: amount_to_pay_in_fees,
                 }],
             });

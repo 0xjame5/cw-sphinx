@@ -14,6 +14,7 @@ pub mod tests {
         pub coin: Coin,
     }
 
+    pub const TEST_GOD: &str = "god"; // the original tester that owns ALL the coins
     pub const TEST_ADMIN: &str = "admin";
     pub const TEST_USER_1: &str = "user1";
     pub const TEST_USER_2: &str = "user2";

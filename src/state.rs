@@ -1,8 +1,12 @@
-use cosmwasm_std::{Addr, Coin};
+use cosmwasm_std::{Addr, Coin, Decimal};
 use cw_storage_plus::{Item, Map};
 use cw_utils::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+pub const ADMIN: Item<Addr> = Item::new("admin_addr");
+
+pub const HOUSE_FEE: Item<Decimal> = Item::new("house_fee");
 
 // Map of players and their ticket allocation
 pub const PLAYERS: Map<&Addr, PlayerInfo> = Map::new("players");

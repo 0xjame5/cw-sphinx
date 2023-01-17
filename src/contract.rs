@@ -3,8 +3,8 @@ use std::ops::{Div, Mul, Range};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, SubMsg,
-    Uint128,
+    to_binary, Addr, BankMsg, Binary, Coin, Decimal, Deps, DepsMut, Env, MessageInfo, Response,
+    StdResult, SubMsg, Uint128,
 };
 use cw2::set_contract_version;
 use cw_utils::{must_pay, Expiration};
@@ -16,28 +16,42 @@ use crate::error::ContractError;
 use crate::helpers::get_player_ranges;
 use crate::models::PlayerRanges;
 use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
-use crate::state::{LotteryState, PlayerInfo, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST};
+use crate::state::{
+    LotteryState, PlayerInfo, ADMIN, HOUSE_FEE, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST,
+};
+use crate::util::{is_admin, validate_house_fee};
 
 /*
-Each individual contract owner will be able to creat their own ticket cost. We require it to be
-set to be more defined.
+Each individual contract owner will be able to creat their own lottery.
+
+The lottery will consist of:
+- the ticket cost per ticekt
+- the winners fee
+- who the admin is
 */
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    // TODO (James): make sure ticket cost is greater than 0 or throw err
+    // TODO (entrancedjames): Require ticket cost to greater than 0
     TICKET_UNIT_COST.save(deps.storage, &msg.ticket_cost)?;
 
+    let admin_addr = deps.api.addr_validate(&msg.admin)?;
+    ADMIN.save(deps.storage, &admin_addr)?;
+
+    let house_fee = validate_house_fee(msg.house_fee)?;
+    let house_fee_percentage = Decimal::percent(house_fee);
+    HOUSE_FEE.save(deps.storage, &house_fee_percentage)?;
     LOTTERY_STATE.save(
         deps.storage,
         &LotteryState::OPEN {
-            expiration: msg.lottery_duration.after(&_env.block),
+            expiration: msg.lottery_duration.after(&env.block),
         },
     )?;
 
@@ -140,14 +154,21 @@ fn update_player(deps: DepsMut, info: &MessageInfo, bought_tickets: u64) -> StdR
 fn execute_lottery(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     seed: u64,
 ) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
     match lottery_state {
-        LotteryState::CHOOSING {} => {
-            // TODO(james):: Check before choosing winner to see if the caller is whitelisted (admin).
-            choose_winner(deps, seed)?;
+        LotteryState::CHOOSING => {
+            is_admin(info.sender, &deps)?;
+            let winner = choose_winner(&deps, seed)?;
+            LOTTERY_STATE.save(
+                deps.storage,
+                &LotteryState::CLOSED {
+                    winner,
+                    claimed: false,
+                },
+            )?;
             Ok(Response::new())
         }
         LotteryState::OPEN { .. } => Err(ContractError::LotteryNotExecutable {}),
@@ -157,7 +178,6 @@ fn execute_lottery(
 
 fn execute_claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
-
     match lottery_state {
         LotteryState::CLOSED { winner, claimed } => {
             handle_lottery_claim(deps, &env, info, winner, claimed)
@@ -185,20 +205,36 @@ fn handle_lottery_claim(
                 },
             )?;
 
-            let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
+            let admin = ADMIN.load(deps.storage)?;
 
+            let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
             let lottery_pool = deps
                 .querier
-                .query_balance(&env.contract.address, ticket_cost.denom)?;
+                .query_balance(&env.contract.address, ticket_cost.denom.clone())?;
+
+            let house_fee = HOUSE_FEE.load(deps.storage)?;
+            let amount_to_pay_in_fees = lottery_pool.amount * house_fee / Uint128::from(100u128);
+            let amount_to_pay_out_to_winner = lottery_pool.amount - amount_to_pay_in_fees;
 
             let disperse_reward_msg = SubMsg::new(BankMsg::Send {
                 to_address: String::from(info.sender),
-                amount: vec![lottery_pool],
+                amount: vec![Coin {
+                    denom: ticket_cost.denom.clone(),
+                    amount: amount_to_pay_out_to_winner,
+                }],
+            });
+
+            let disperse_fee_msg = SubMsg::new(BankMsg::Send {
+                to_address: String::from(admin),
+                amount: vec![Coin {
+                    denom: ticket_cost.denom,
+                    amount: amount_to_pay_in_fees,
+                }],
             });
 
             let mut response: Response = Default::default();
 
-            response.messages = vec![disperse_reward_msg];
+            response.messages = vec![disperse_reward_msg, disperse_fee_msg];
 
             Ok(response)
         } else {
@@ -209,14 +245,14 @@ fn handle_lottery_claim(
     }
 }
 
-fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
+fn choose_winner(deps: &DepsMut, seed: u64) -> Result<Addr, ContractError> {
     let mut rng = Pcg32::seed_from_u64(seed);
-    let total_tickets = get_num_tickets(&deps);
+    let total_tickets = get_num_tickets(deps);
     let winner_ticket = rng.gen_range(Range {
         start: 0,
         end: total_tickets,
     });
-    let player_ranges = create_player_ranges(&deps, total_tickets);
+    let player_ranges = create_player_ranges(deps, total_tickets);
 
     let mut addr = None;
     for player_range in player_ranges.ranges {
@@ -224,16 +260,10 @@ fn choose_winner(deps: DepsMut, seed: u64) -> StdResult<()> {
             addr = Some(player_range.player_addr)
         }
     }
-
-    let winner = addr.unwrap();
-
-    LOTTERY_STATE.save(
-        deps.storage,
-        &LotteryState::CLOSED {
-            winner,
-            claimed: false,
-        },
-    )
+    match addr {
+        None => Err(ContractError::WinnerNotPossibleToFind {}),
+        Some(winner) => Ok(winner),
+    }
 }
 
 fn create_player_ranges(deps: &DepsMut, total_tickets: u64) -> PlayerRanges {
@@ -292,7 +322,7 @@ mod tests {
     use crate::msg::ExecuteMsg;
     use crate::msg::InstantiateMsg;
     use crate::test_util::tests::{
-        TestUser, TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST,
+        TestUser, TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN,
     };
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
     use cosmwasm_std::{coin, coins, Addr};
@@ -302,6 +332,8 @@ mod tests {
         let instantiate_message = InstantiateMsg {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
+            admin: TEST_ADMIN.to_string(),
+            house_fee: 500,
         };
 
         let mut deps = mock_dependencies();
@@ -315,6 +347,8 @@ mod tests {
         let instantiate_message = InstantiateMsg {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
+            admin: TEST_ADMIN.to_string(),
+            house_fee: 500,
         };
 
         let mut deps = mock_dependencies();
@@ -353,6 +387,8 @@ mod tests {
         let instantiate_message = InstantiateMsg {
             ticket_cost: coin(TESTING_TICKET_COST, TESTING_NATIVE_DENOM),
             lottery_duration: TESTING_DURATION,
+            admin: TEST_ADMIN.to_string(),
+            house_fee: 500,
         };
 
         let test_users = vec![

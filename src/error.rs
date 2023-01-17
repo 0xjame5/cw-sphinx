@@ -14,6 +14,9 @@ pub enum ContractError {
     #[error("Unauthorized")]
     Unauthorized {},
 
+    #[error("Invalid fee passed in.")]
+    ContractInstantiationInvalidFee {},
+
     #[error("Not enough funds passed for the number of tickets being bought.")]
     TicketBuyingIncorrectAmount {},
 
@@ -22,6 +25,9 @@ pub enum ContractError {
 
     #[error("The current lottery is not executable because it is decided or still open.")]
     LotteryNotExecutable {},
+
+    #[error("The current lottery is not executable because it is decided or still open.")]
+    WinnerNotPossibleToFind {},
 
     #[error("The current lottery is not in a state that rewards can be claimed.")]
     LotteryNotClaimable {},

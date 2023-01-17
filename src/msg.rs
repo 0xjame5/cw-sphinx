@@ -14,7 +14,7 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     BuyTicket { num_tickets: u64 },
     ExecuteLottery { seed: u64 },
-    ClaimTokens,
+    ClaimTokens {},
 }
 
 #[cw_serde]
@@ -23,7 +23,7 @@ pub enum QueryMsg {
     #[returns(TicketResponse)]
     TicketCount { addr: Addr },
     #[returns(LotteryStateResponse)]
-    LotteryState,
+    LotteryState {},
 }
 
 #[cw_serde]

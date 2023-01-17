@@ -65,7 +65,7 @@ pub fn execute(
     match msg {
         ExecuteMsg::BuyTicket { num_tickets } => execute_buy_ticket(deps, env, info, num_tickets),
         ExecuteMsg::ExecuteLottery { seed } => execute_lottery(deps, env, info, seed),
-        ExecuteMsg::ClaimTokens => execute_claim(deps, env, info),
+        ExecuteMsg::ClaimTokens {} => execute_claim(deps, env, info),
     }
 }
 
@@ -80,7 +80,7 @@ fn execute_buy_ticket(
         LotteryState::OPEN { expiration } => {
             handle_open_lottery(deps, &_env, &info, bought_tickets, expiration)
         }
-        LotteryState::CHOOSING => Err(ContractError::TicketBuyingNotAvailable {}),
+        LotteryState::CHOOSING {} => Err(ContractError::TicketBuyingNotAvailable {}),
         LotteryState::CLOSED { .. } => Err(ContractError::TicketBuyingNotAvailable {}),
     }
 }
@@ -145,7 +145,7 @@ fn execute_lottery(
 ) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
     match lottery_state {
-        LotteryState::CHOOSING => {
+        LotteryState::CHOOSING {} => {
             // TODO(james):: Check before choosing winner to see if the caller is whitelisted (admin).
             choose_winner(deps, seed)?;
             Ok(Response::new())
@@ -162,7 +162,7 @@ fn execute_claim(deps: DepsMut, env: Env, info: MessageInfo) -> Result<Response,
         LotteryState::CLOSED { winner, claimed } => {
             handle_lottery_claim(deps, &env, info, winner, claimed)
         }
-        LotteryState::CHOOSING => Err(ContractError::LotteryNotClaimable {}),
+        LotteryState::CHOOSING {} => Err(ContractError::LotteryNotClaimable {}),
         LotteryState::OPEN { .. } => Err(ContractError::LotteryNotClaimable {}),
     }
 }
@@ -267,7 +267,7 @@ fn get_num_tickets(deps: &DepsMut) -> u64 {
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::TicketCount { addr } => to_binary(&query_ticket_count(deps, _env, addr)?),
-        QueryMsg::LotteryState => to_binary(&query_lottery_state(deps, _env)?),
+        QueryMsg::LotteryState {} => to_binary(&query_lottery_state(deps, _env)?),
     }
 }
 

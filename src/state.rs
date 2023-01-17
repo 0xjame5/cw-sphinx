@@ -24,7 +24,7 @@ pub enum LotteryState {
         // to have a time window for buying
         expiration: Expiration,
     },
-    CHOOSING,
+    CHOOSING {},
     CLOSED {
         winner: Addr,
         claimed: bool,

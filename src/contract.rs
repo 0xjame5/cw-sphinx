@@ -159,7 +159,7 @@ fn execute_lottery(
 ) -> Result<Response, ContractError> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
     match lottery_state {
-        LotteryState::CHOOSING => {
+        LotteryState::CHOOSING {} => {
             is_admin(info.sender, &deps)?;
             let winner = choose_winner(&deps, seed)?;
             LOTTERY_STATE.save(

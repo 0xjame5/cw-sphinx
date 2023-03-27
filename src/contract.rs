@@ -9,7 +9,6 @@ use cosmwasm_std::{
 use cw2::set_contract_version;
 use cw_utils::{must_pay, Expiration};
 use rand::{Rng, SeedableRng};
-use rand_pcg::Pcg32;
 
 use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION, TOTAL_POOL_SIZE};
 use crate::error::ContractError;
@@ -246,7 +245,7 @@ fn handle_lottery_claim(
 }
 
 fn choose_winner(deps: &DepsMut, seed: u64) -> Result<Addr, ContractError> {
-    let mut rng = Pcg32::seed_from_u64(seed);
+    let mut rng: rand::rngs::StdRng = SeedableRng::seed_from_u64(seed);
     let total_tickets = get_num_tickets(deps);
     let winner_ticket = rng.gen_range(Range {
         start: 0,

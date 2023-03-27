@@ -246,9 +246,8 @@ fn handle_lottery_claim(
 
 fn choose_winner(deps: &DepsMut, seed: u64) -> Result<Addr, ContractError> {
     let mut rng: rand::rngs::StdRng = SeedableRng::seed_from_u64(seed);
-
     let total_tickets = get_num_tickets(deps);
-    let winner_ticket: u64 = rng.gen_range(Range {
+    let winner_ticket = rng.gen_range(Range {
         start: 0,
         end: total_tickets,
     });

@@ -124,7 +124,7 @@ mod tests {
             )
             .unwrap();
 
-        let ticket_response_for_user3: TicketResponse = app
+        let ticket_response_for_user_1: TicketResponse = app
             .wrap()
             .query_wasm_smart(
                 lotto_contract_addr.clone(),
@@ -135,9 +135,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            ticket_response_for_user3,
+            ticket_response_for_user_1,
             TicketResponse { tickets: Some(1) }
         );
+
+        let ticket_response_for_user_2: TicketResponse = app
+            .wrap()
+            .query_wasm_smart(
+                lotto_contract_addr.clone(),
+                &QueryMsg::TicketCount {
+                    addr: Addr::unchecked(TEST_USER_2),
+                },
+            )
+            .unwrap();
+
+        assert_eq!(ticket_response_for_user_2, TicketResponse { tickets: None });
 
         // Below validate user cannot buy tickets once the state has changed
         let app_resp_err = app

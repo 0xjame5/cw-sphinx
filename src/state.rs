@@ -9,7 +9,7 @@ pub const ADMIN: Item<Addr> = Item::new("admin_addr");
 pub const HOUSE_FEE: Item<Decimal> = Item::new("house_fee");
 
 // Map of players and their ticket allocation
-pub const PLAYERS: Map<&Addr, PlayerInfo> = Map::new("players");
+pub const PLAYERS: Map<Addr, u64> = Map::new("players");
 
 // The cost per ticket. can be native token, juno or what have you.
 pub const TICKET_UNIT_COST: Item<Coin> = Item::new("ticket_cost");

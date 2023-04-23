@@ -5,7 +5,7 @@ mod tests {
     use cw_multi_test::{App, Contract, ContractWrapper, Executor};
     use cw_utils::Duration;
 
-    use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg};
+    use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
     use crate::state::LotteryState;
     use crate::test_util::tests::{
         TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN, TEST_GOD,
@@ -124,6 +124,33 @@ mod tests {
             )
             .unwrap();
 
+        let ticket_response_for_user_1: TicketResponse = app
+            .wrap()
+            .query_wasm_smart(
+                lotto_contract_addr.clone(),
+                &QueryMsg::TicketCount {
+                    addr: Addr::unchecked(TEST_USER_1),
+                },
+            )
+            .unwrap();
+
+        assert_eq!(
+            ticket_response_for_user_1,
+            TicketResponse { tickets: Some(1) }
+        );
+
+        let ticket_response_for_user_2: TicketResponse = app
+            .wrap()
+            .query_wasm_smart(
+                lotto_contract_addr.clone(),
+                &QueryMsg::TicketCount {
+                    addr: Addr::unchecked(TEST_USER_2),
+                },
+            )
+            .unwrap();
+
+        assert_eq!(ticket_response_for_user_2, TicketResponse { tickets: None });
+
         // Below validate user cannot buy tickets once the state has changed
         let app_resp_err = app
             .execute_contract(
@@ -133,6 +160,7 @@ mod tests {
                 &[],
             )
             .unwrap_err();
+
         assert_eq!(
             ContractError::TicketBuyingNotAvailable {},
             app_resp_err.downcast().unwrap()

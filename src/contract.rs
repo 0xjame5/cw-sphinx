@@ -15,9 +15,7 @@ use crate::error::ContractError;
 use crate::helpers::get_player_ranges;
 use crate::models::PlayerRanges;
 use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
-use crate::state::{
-    LotteryState, PlayerInfo, ADMIN, HOUSE_FEE, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST,
-};
+use crate::state::{LotteryState, ADMIN, HOUSE_FEE, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST};
 use crate::util::{is_admin, validate_house_fee};
 
 /*
@@ -115,9 +113,7 @@ fn handle_open_lottery(
         let total_cost = ticket_cost
             .amount
             .checked_mul(Uint128::new(u128::from(bought_tickets)))?;
-
         let amount_received_future = must_pay(info, &ticket_cost.denom)?;
-
         if amount_received_future == total_cost {
             update_player(deps, info, bought_tickets)?;
             Ok(Response::new())
@@ -133,21 +129,16 @@ fn handle_open_lottery(
 }
 
 fn update_player(deps: DepsMut, info: &MessageInfo, bought_tickets: u64) -> StdResult<()> {
-    let some_player_info = PLAYERS.may_load(deps.storage, &info.sender)?;
+    let some_player_info = PLAYERS.may_load(deps.storage, info.sender.clone())?;
     match some_player_info {
-        None => {
-            let new_player_info = PlayerInfo {
-                tickets: bought_tickets,
-            };
-            PLAYERS.save(deps.storage, &info.sender, &new_player_info)
+        None => PLAYERS.save(deps.storage, info.sender.clone(), &bought_tickets),
+        Some(previous_ticket_count) => {
+            let new_ticket_count = bought_tickets + previous_ticket_count;
+            PLAYERS.save(deps.storage, info.sender.clone(), &new_ticket_count)
         }
-        Some(player_info) => {
-            let new_player_info = PlayerInfo {
-                tickets: player_info.tickets + bought_tickets,
-            };
-            PLAYERS.save(deps.storage, &info.sender, &new_player_info)
-        }
-    }
+    }?;
+
+    Result::Ok(())
 }
 
 fn execute_lottery(
@@ -269,9 +260,8 @@ fn create_player_ranges(deps: &DepsMut, total_tickets: u64) -> PlayerRanges {
     let mut player_ranges = PlayerRanges::create();
     let mut current_index = 0;
     for player_result in get_player_ranges(deps) {
-        let (addr, player_info) = player_result.unwrap();
-        let number_of_tickets_to_ration =
-            TOTAL_POOL_SIZE.div(total_tickets).mul(player_info.tickets);
+        let (addr, num_tickets) = player_result.unwrap();
+        let number_of_tickets_to_ration = TOTAL_POOL_SIZE.div(total_tickets).mul(num_tickets);
         player_ranges.create_player_range(
             addr,
             current_index,
@@ -286,8 +276,8 @@ fn get_num_tickets(deps: &DepsMut) -> u64 {
     let players = get_player_ranges(deps);
     let mut total_num_tickets: u64 = 0;
     for player_results in players {
-        let (_addr, player_info) = player_results.unwrap();
-        total_num_tickets += player_info.tickets
+        let (_addr, num_tickets) = player_results.unwrap();
+        total_num_tickets += num_tickets
     }
     total_num_tickets
 }
@@ -308,23 +298,23 @@ pub fn query_lottery_state(deps: Deps, _env: Env) -> StdResult<LotteryStateRespo
 }
 
 pub fn query_ticket_count(deps: Deps, _env: Env, addr: Addr) -> StdResult<TicketResponse> {
-    let res = PLAYERS.may_load(deps.storage, &addr)?;
-    let tickets_opt: Option<u64> = res.map(|player_info| player_info.tickets);
+    let player_num_tickets = PLAYERS.may_load(deps.storage, addr)?;
     Ok(TicketResponse {
-        tickets: tickets_opt,
+        tickets: player_num_tickets,
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{coin, coins, Addr};
+
     use crate::contract::{execute, instantiate, query_ticket_count};
     use crate::msg::ExecuteMsg;
     use crate::msg::InstantiateMsg;
     use crate::test_util::tests::{
         TestUser, TESTING_DURATION, TESTING_NATIVE_DENOM, TESTING_TICKET_COST, TEST_ADMIN,
     };
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, Addr};
 
     #[test]
     fn proper_initialization() {

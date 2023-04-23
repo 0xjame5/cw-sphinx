@@ -132,10 +132,11 @@ fn update_player(deps: DepsMut, info: &MessageInfo, bought_tickets: u64) -> StdR
     let some_player_info = PLAYERS.may_load(deps.storage, info.sender.clone())?;
     match some_player_info {
         None => PLAYERS.save(deps.storage, info.sender.clone(), &bought_tickets),
-        Some(previous_ticket_count) => {
-            let new_ticket_count = bought_tickets + previous_ticket_count;
-            PLAYERS.save(deps.storage, info.sender.clone(), &new_ticket_count)
-        }
+        Some(previous_ticket_count) => PLAYERS.save(
+            deps.storage,
+            info.sender.clone(),
+            &(bought_tickets + previous_ticket_count),
+        ),
     }?;
 
     Result::Ok(())

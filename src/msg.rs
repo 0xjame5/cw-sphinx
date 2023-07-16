@@ -1,4 +1,4 @@
-use crate::state::LotteryState;
+use crate::state::{Config, LotteryState};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_schema::QueryResponses;
 use cosmwasm_std::{Addr, Coin};
@@ -26,6 +26,8 @@ pub enum QueryMsg {
     TicketCount { addr: Addr },
     #[returns(LotteryStateResponse)]
     LotteryState {},
+    #[returns(ConfigResponse)]
+    Config {},
 }
 
 #[cw_serde]
@@ -36,4 +38,9 @@ pub struct TicketResponse {
 #[cw_serde]
 pub struct LotteryStateResponse {
     pub lotto_state: LotteryState,
+}
+
+#[cw_serde]
+pub struct ConfigResponse {
+    pub config: Config,
 }

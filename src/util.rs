@@ -1,16 +1,15 @@
-use cosmwasm_std::{Addr, DepsMut};
+use cosmwasm_std::Addr;
 
 use crate::constants::MAX_HOUSE_FEE;
-use crate::state::ADMIN;
+use crate::state::Config;
 use crate::ContractError;
 use crate::ContractError::Unauthorized;
 
-pub fn is_admin(sender: Addr, deps: &DepsMut) -> Result<Addr, ContractError> {
-    let admin_addr = ADMIN.load(deps.storage)?;
-    if admin_addr != sender {
+pub fn is_admin(sender: Addr, config: Config) -> Result<(), ContractError> {
+    if config.admin != sender {
         Err(Unauthorized {})
     } else {
-        Ok(admin_addr)
+        Ok(())
     }
 }
 

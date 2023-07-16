@@ -14,8 +14,10 @@ use crate::constants::{CONTRACT_NAME, CONTRACT_VERSION, TOTAL_POOL_SIZE};
 use crate::error::ContractError;
 use crate::helpers::get_player_ranges;
 use crate::models::PlayerRanges;
-use crate::msg::{ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse};
-use crate::state::{LotteryState, ADMIN, HOUSE_FEE, LOTTERY_STATE, PLAYERS, TICKET_UNIT_COST};
+use crate::msg::{
+    ConfigResponse, ExecuteMsg, InstantiateMsg, LotteryStateResponse, QueryMsg, TicketResponse,
+};
+use crate::state::{Config, LotteryState, CONFIG, LOTTERY_STATE, PLAYERS};
 use crate::util::{is_admin, validate_house_fee};
 
 /*
@@ -37,14 +39,18 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     // TODO (entrancedjames): Require ticket cost to greater than 0
-    TICKET_UNIT_COST.save(deps.storage, &msg.ticket_cost)?;
-
     let admin_addr = deps.api.addr_validate(&msg.admin)?;
-    ADMIN.save(deps.storage, &admin_addr)?;
-
     let house_fee = validate_house_fee(msg.house_fee)?;
     let house_fee_percentage = Decimal::percent(house_fee);
-    HOUSE_FEE.save(deps.storage, &house_fee_percentage)?;
+
+    let config = Config {
+        admin: admin_addr,
+        house_fee: house_fee_percentage,
+        ticket_unit_cost: msg.ticket_cost,
+    };
+
+    CONFIG.save(deps.storage, &config)?;
+
     LOTTERY_STATE.save(
         deps.storage,
         &LotteryState::OPEN {
@@ -108,7 +114,8 @@ fn handle_open_lottery(
     if !(expiration.is_expired(&env.block)) {
         // Take the amount of tokens sent, and verify its the amount needed.
         // Should be an exact amount.
-        let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
+        let config = CONFIG.load(deps.storage)?;
+        let ticket_cost = config.ticket_unit_cost;
 
         let total_cost = ticket_cost
             .amount
@@ -148,10 +155,11 @@ fn execute_lottery(
     info: MessageInfo,
     seed: u64,
 ) -> Result<Response, ContractError> {
+    let config = CONFIG.load(deps.storage)?;
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
     match lottery_state {
         LotteryState::CHOOSING {} => {
-            is_admin(info.sender, &deps)?;
+            is_admin(info.sender, config)?;
             let winner = choose_winner(&deps, seed)?;
             LOTTERY_STATE.save(
                 deps.storage,
@@ -196,14 +204,15 @@ fn handle_lottery_claim(
                 },
             )?;
 
-            let admin = ADMIN.load(deps.storage)?;
+            let config = CONFIG.load(deps.storage)?;
+            let admin = config.admin;
+            let house_fee = config.house_fee;
+            let ticket_cost = config.ticket_unit_cost;
 
-            let ticket_cost = TICKET_UNIT_COST.load(deps.storage)?;
             let lottery_pool = deps
                 .querier
                 .query_balance(&env.contract.address, ticket_cost.denom.clone())?;
 
-            let house_fee = HOUSE_FEE.load(deps.storage)?;
             let amount_to_pay_in_fees = lottery_pool.amount * house_fee / Uint128::from(100u128);
             let amount_to_pay_out_to_winner = lottery_pool.amount - amount_to_pay_in_fees;
 
@@ -288,6 +297,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::TicketCount { addr } => to_binary(&query_ticket_count(deps, _env, addr)?),
         QueryMsg::LotteryState {} => to_binary(&query_lottery_state(deps, _env)?),
+        QueryMsg::Config {} => to_binary(&query_config(deps)?),
     }
 }
 
@@ -303,6 +313,11 @@ pub fn query_ticket_count(deps: Deps, _env: Env, addr: Addr) -> StdResult<Ticket
     Ok(TicketResponse {
         tickets: player_num_tickets,
     })
+}
+
+pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
+    let config = CONFIG.load(deps.storage)?;
+    Ok(ConfigResponse { config })
 }
 
 #[cfg(test)]

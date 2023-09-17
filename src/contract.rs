@@ -303,20 +303,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
 pub fn query_lottery_state(deps: Deps, _env: Env) -> StdResult<LotteryStateResponse> {
     let lottery_state = LOTTERY_STATE.load(deps.storage)?;
-
-    let player_keys = PLAYERS.keys(deps.storage, None, None, cosmwasm_std::Order::Ascending);
-
-    let mut sum: u64 = 0;
-
-    for player_key in player_keys {
-        let key = player_key?;
-        let player = PLAYERS.load(deps.storage, key)?;
-        sum += player
-    }
-
     Ok(LotteryStateResponse {
         lotto_state: lottery_state,
-        total_tickets: sum,
     })
 }
 

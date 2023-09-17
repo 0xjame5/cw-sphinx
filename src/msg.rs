@@ -25,7 +25,7 @@ pub enum QueryMsg {
     #[returns(TicketResponse)]
     TicketCount { addr: Addr },
     #[returns(LotteryStateResponse)]
-    LotteryState {}, // not just the lottery state but more
+    LotteryState {},
     #[returns(ConfigResponse)]
     Config {},
 }
@@ -38,7 +38,6 @@ pub struct TicketResponse {
 #[cw_serde]
 pub struct LotteryStateResponse {
     pub lotto_state: LotteryState,
-    pub total_tickets: u64,
 }
 
 #[cw_serde]

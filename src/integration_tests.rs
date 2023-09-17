@@ -454,7 +454,7 @@ mod tests {
             }
         );
 
-        // User should have owned minus fees
+        // User 2 lost all that was put in.
         assert_eq!(
             app.wrap()
                 .query_balance(Addr::unchecked(TEST_USER_1), TESTING_NATIVE_DENOM)
@@ -465,7 +465,7 @@ mod tests {
             }
         );
 
-        // User should have owned minus fees
+        // User 3 won minus the fees
         assert_eq!(
             app.wrap()
                 .query_balance(Addr::unchecked(TEST_USER_2), TESTING_NATIVE_DENOM)
@@ -476,7 +476,7 @@ mod tests {
             }
         );
 
-        // Admin should have some more tokens now
+        // Admin should have some more tokens now from fee
         assert_eq!(
             app.wrap()
                 .query_balance(Addr::unchecked(TEST_ADMIN), TESTING_NATIVE_DENOM)

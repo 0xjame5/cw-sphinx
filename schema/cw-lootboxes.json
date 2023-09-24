@@ -280,11 +280,17 @@
       "title": "LotteryStateResponse",
       "type": "object",
       "required": [
-        "lotto_state"
+        "lotto_state",
+        "total_tickets"
       ],
       "properties": {
         "lotto_state": {
           "$ref": "#/definitions/LotteryState"
+        },
+        "total_tickets": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
         }
       },
       "additionalProperties": false,
